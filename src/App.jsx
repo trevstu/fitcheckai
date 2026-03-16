@@ -125,7 +125,7 @@ function StatCard({ label, value, sub }) {
   return (
     <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: "1rem", flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 800, color: TEXT }}>{value}</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: TEXT }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>{sub}</div>}
     </div>
   );
@@ -153,7 +153,7 @@ function AdminModal({ section, data, onSave, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: 16 }}>
-      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 20, padding: "1.5rem", width: "100%", maxWidth: 560, maxHeight: "80vh", overflowY: "auto" }}>
+      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 20, padding: "1.5rem", width: "100%", maxWidth: 560, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: TEXT }}>Edit {section}</span>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: TEXT_MUTED }}>×</button>
@@ -249,14 +249,25 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [cheerForm, setCheerForm] = useState({});
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const fileRef = useRef();
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(true);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     (async () => {
       try {
         const r5 = await window.storage.get("stuesdays_v5");
         if (r5?.value) { setData(JSON.parse(r5.value)); setLoaded(true); return; }
-        // Migrate from v4
         const r4 = await window.storage.get("stuesdays_v4");
         if (r4?.value) {
           const old = JSON.parse(r4.value);
@@ -313,10 +324,15 @@ export default function App() {
 
   const sorted = [...(data.announcements || [])].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
+  const navigateTo = (id) => {
+    setTab(id);
+    if (isMobile) setSidebarOpen(false);
+  };
+
   if (!loaded) return <div style={{ background: BG, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_MUTED, fontSize: 14 }}>Loading...</div>;
 
   return (
-    <div style={{ background: BG, minHeight: "100vh", fontFamily: "'Inter', system-ui, sans-serif", display: "flex", color: TEXT }}>
+    <div style={{ background: BG, minHeight: "100vh", fontFamily: "'Inter', system-ui, sans-serif", color: TEXT }}>
       {editSection && <AdminModal section={editSection.section} data={editSection.arr} onSave={arr => saveSection(editSection.section, arr)} onClose={() => setEditSection(null)} />}
 
       {showAuthModal && (
@@ -343,9 +359,27 @@ export default function App() {
         </div>
       )}
 
+      {/* Mobile overlay backdrop */}
+      {isMobile && sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 40 }} />
+      )}
+
       {/* Sidebar */}
-      <div style={{ width: 220, background: SIDEBAR_BG, borderRight: `1px solid ${CARD_BORDER}`, display: "flex", flexDirection: "column", padding: "1.25rem 0", flexShrink: 0, minHeight: "100vh" }}>
-        <div style={{ padding: "0 1rem 1.25rem", borderBottom: `1px solid ${CARD_BORDER}`, marginBottom: "0.75rem" }}>
+      <div style={{
+        position: isMobile ? "fixed" : "fixed",
+        top: 0, left: 0, bottom: 0,
+        width: 240,
+        background: SIDEBAR_BG,
+        borderRight: `1px solid ${CARD_BORDER}`,
+        display: "flex",
+        flexDirection: "column",
+        padding: "1.25rem 0",
+        zIndex: 50,
+        transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+        transition: "transform 0.25s ease",
+        overflowY: "auto",
+      }}>
+        <div style={{ padding: "0 1rem 1.25rem", borderBottom: `1px solid ${CARD_BORDER}`, marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <StuLogo size={38} />
             <div>
@@ -353,17 +387,17 @@ export default function App() {
               <div style={{ fontSize: 11, color: TEXT_MUTED }}>Run Club</div>
             </div>
           </div>
+          <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", color: TEXT_MUTED, cursor: "pointer", fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
         </div>
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ flex: 1 }}>
           {NAV.map(n => (
-            <button key={n.id} onClick={() => setTab(n.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 1rem", background: tab === n.id ? ORANGE_DIM : "transparent", border: "none", borderLeft: tab === n.id ? `3px solid ${ORANGE}` : "3px solid transparent", color: tab === n.id ? ORANGE : TEXT_MUTED, cursor: "pointer", fontSize: 13, fontWeight: tab === n.id ? 700 : 400, textAlign: "left", transition: "all 0.1s" }}>
-              <span style={{ fontSize: 15 }}>{n.icon}</span> {n.id}
+            <button key={n.id} onClick={() => navigateTo(n.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 1rem", background: tab === n.id ? ORANGE_DIM : "transparent", border: "none", borderLeft: tab === n.id ? `3px solid ${ORANGE}` : "3px solid transparent", color: tab === n.id ? ORANGE : TEXT_MUTED, cursor: "pointer", fontSize: 14, fontWeight: tab === n.id ? 700 : 400, textAlign: "left", transition: "all 0.1s" }}>
+              <span style={{ fontSize: 16 }}>{n.icon}</span> {n.id}
             </button>
           ))}
         </div>
         <div style={{ padding: "1rem", borderTop: `1px solid ${CARD_BORDER}` }}>
           {saveMsg && <div style={{ fontSize: 11, color: "#4ade80", marginBottom: 6, textAlign: "center" }}>{saveMsg}</div>}
-          {/* Member login section */}
           <div style={{ marginBottom: 8 }}>
             {currentUser ? (
               <div>
@@ -384,18 +418,58 @@ export default function App() {
         </div>
       </div>
 
+      {/* Top bar (always visible) */}
+      <div style={{
+        position: "fixed", top: 0, left: 0, right: 0,
+        height: 56,
+        background: SIDEBAR_BG,
+        borderBottom: `1px solid ${CARD_BORDER}`,
+        display: "flex",
+        alignItems: "center",
+        padding: "0 1rem",
+        gap: 12,
+        zIndex: 30,
+      }}>
+        <button onClick={() => setSidebarOpen(o => !o)} style={{ background: "none", border: "none", color: TEXT_MUTED, cursor: "pointer", display: "flex", flexDirection: "column", gap: 4, padding: 6, borderRadius: 8 }}>
+          <span style={{ display: "block", width: 20, height: 2, background: TEXT_MUTED, borderRadius: 2 }} />
+          <span style={{ display: "block", width: 20, height: 2, background: TEXT_MUTED, borderRadius: 2 }} />
+          <span style={{ display: "block", width: 20, height: 2, background: TEXT_MUTED, borderRadius: 2 }} />
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <StuLogo size={28} />
+          <span style={{ fontWeight: 800, fontSize: 15, color: TEXT, letterSpacing: -0.3 }}>Stuesdays</span>
+        </div>
+        {/* Right side: user avatar or sign in */}
+        <div style={{ marginLeft: "auto" }}>
+          {currentUser ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Avatar name={currentUser.name} size={28} />
+              {!isMobile && <span style={{ fontSize: 13, color: TEXT, fontWeight: 600 }}>{currentUser.name}</span>}
+            </div>
+          ) : (
+            <button onClick={() => { setAuthMode("login"); setShowAuthModal(true); }} style={{ fontSize: 12, padding: "6px 14px", borderRadius: 20, border: `1px solid ${CARD_BORDER}`, background: "transparent", color: TEXT_MUTED, cursor: "pointer", fontWeight: 600 }}>Sign In</button>
+          )}
+        </div>
+      </div>
+
       {/* Main content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem", maxWidth: 720 }}>
+      <div style={{
+        marginTop: 56,
+        padding: isMobile ? "1rem" : "1.5rem 2rem",
+        maxWidth: 760,
+        width: "100%",
+        boxSizing: "border-box",
+      }}>
 
         {/* Page header */}
-        <div style={{ marginBottom: "1.5rem" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: TEXT, letterSpacing: -0.5 }}>{NAV.find(n => n.id === tab)?.icon} {tab}</div>
+        <div style={{ marginBottom: "1.25rem" }}>
+          <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: TEXT, letterSpacing: -0.5 }}>{NAV.find(n => n.id === tab)?.icon} {tab}</div>
         </div>
 
         {/* OVERVIEW */}
         {tab === "Overview" && (
           <div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: "1.25rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: "1.25rem" }}>
               <StatCard label="Members" value={data.members.length} sub="Active community" />
               <StatCard label="Runs" value={data.history.length} sub="Since launch" />
               <StatCard label="Next run" value="Mar 18" sub={data.upcomingRun.route} />
@@ -449,7 +523,7 @@ export default function App() {
               </div>
             </Card>
             <Card>
-              <a href="https://withforte.co/@stuesdays" target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center", padding: "10px 16px", borderRadius: 10, background: ORANGE, color: "#fff", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>Register with Forte</a>
+              <a href="https://withforte.co/@stuesdays" target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center", padding: "12px 16px", borderRadius: 10, background: ORANGE, color: "#fff", fontWeight: 700, fontSize: 15, textDecoration: "none" }}>Register with Forte</a>
             </Card>
           </div>
         )}
@@ -465,17 +539,14 @@ export default function App() {
               <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: i < data.members.length - 1 ? `1px solid ${CARD_BORDER}` : "none" }}>
                 <span style={{ fontSize: 14, fontWeight: 800, color: i === 0 ? "#facc15" : i === 1 ? "#94a3b8" : i === 2 ? "#fb923c" : TEXT_DIM, width: 24 }}>{i + 1}</span>
                 <Avatar name={m.name} size={36} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, color: TEXT, fontWeight: 600 }}>{m.name}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, color: TEXT, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
                   <div style={{ fontSize: 12, color: TEXT_MUTED }}>🔥 {m.streak} week streak</div>
                 </div>
-                {m.badge && <Badge text={m.badge} />}
-                <div style={{ textAlign: "right", minWidth: 44 }}>
+                {m.badge && !isMobile && <Badge text={m.badge} />}
+                <div style={{ textAlign: "right", minWidth: 40 }}>
                   <div style={{ fontSize: 16, fontWeight: 800, color: ORANGE }}>{m.runs}</div>
                   <div style={{ fontSize: 11, color: TEXT_DIM }}>runs</div>
-                </div>
-                <div style={{ width: 60, height: 5, background: "#222", borderRadius: 3, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${Math.round((m.runs / (data.members[0]?.runs || 1)) * 100)}%`, background: i < 3 ? ORANGE : "#333", borderRadius: 3 }} />
                 </div>
               </div>
             ))}
@@ -486,7 +557,7 @@ export default function App() {
         {tab === "Routes" && (
           <div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}><EditBtn section="Routes" arr={data.routes} /></div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
               {data.routes.map(r => (
                 <Card key={r.name}>
                   <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, color: TEXT }}>{r.name}</div>
@@ -506,10 +577,10 @@ export default function App() {
               <EditBtn section="History" arr={data.history} />
             </div>
             {data.history.map((h, i) => (
-              <div key={h.date + i} style={{ display: "flex", gap: 12, padding: "10px 0", borderBottom: i < data.history.length - 1 ? `1px solid ${CARD_BORDER}` : "none" }}>
-                <div style={{ minWidth: 88, fontSize: 12, color: TEXT_MUTED, paddingTop: 2 }}>{h.date}</div>
-                <div style={{ flex: 1 }}><div style={{ fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 2 }}>{h.route}</div><div style={{ fontSize: 12, color: TEXT_MUTED }}>{h.notes}</div></div>
-                <div style={{ textAlign: "right", minWidth: 44 }}><div style={{ fontSize: 15, fontWeight: 800, color: ORANGE }}>{h.attendees}</div><div style={{ fontSize: 11, color: TEXT_DIM }}>showed</div></div>
+              <div key={h.date + i} style={{ display: "flex", gap: 12, padding: "12px 0", borderBottom: i < data.history.length - 1 ? `1px solid ${CARD_BORDER}` : "none" }}>
+                <div style={{ minWidth: 72, fontSize: 12, color: TEXT_MUTED, paddingTop: 2, flexShrink: 0 }}>{h.date}</div>
+                <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 2 }}>{h.route}</div><div style={{ fontSize: 12, color: TEXT_MUTED }}>{h.notes}</div></div>
+                <div style={{ textAlign: "right", minWidth: 40, flexShrink: 0 }}><div style={{ fontSize: 15, fontWeight: 800, color: ORANGE }}>{h.attendees}</div><div style={{ fontSize: 11, color: TEXT_DIM }}>showed</div></div>
               </div>
             ))}
           </Card>
@@ -522,11 +593,11 @@ export default function App() {
               <div style={{ fontSize: 13, color: TEXT_MUTED }}>Exclusive perks for Stuesdays members.</div>
               <EditBtn section="Partners" arr={data.partners} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
               {data.partners.map(p => (
                 <Card key={p.name}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 12, background: ORANGE_DIM, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{p.emoji}</div>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: ORANGE_DIM, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{p.emoji}</div>
                     <div><div style={{ fontWeight: 700, fontSize: 14, color: TEXT }}>{p.name}</div><div style={{ fontSize: 11, color: TEXT_MUTED }}>{p.category}</div></div>
                   </div>
                   <div style={{ fontSize: 13, color: TEXT_MUTED, marginBottom: 10 }}>{p.perk}</div>
@@ -547,12 +618,15 @@ export default function App() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {data.events.map((e, idx) => (
                 <Card key={e.name + idx} style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                  <div style={{ minWidth: 52, textAlign: "center" }}>
+                  <div style={{ minWidth: 44, textAlign: "center", flexShrink: 0 }}>
                     <div style={{ fontSize: 10, color: TEXT_MUTED, textTransform: "uppercase", letterSpacing: 1 }}>{e.date.split(" ")[0]}</div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: ORANGE }}>{e.date.split(" ")[1]?.replace(",","")}</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: ORANGE }}>{e.date.split(" ")[1]?.replace(",","")}</div>
                   </div>
-                  <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginBottom: 2 }}>{e.name}</div><div style={{ fontSize: 12, color: TEXT_MUTED }}>{e.time} · {e.loc}</div></div>
-                  <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: e.type === "Run" ? ORANGE_DIM : "rgba(139,92,246,0.15)", color: e.type === "Run" ? ORANGE : "#a78bfa", fontWeight: 600 }}>{e.type}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginBottom: 2 }}>{e.name}</div>
+                    <div style={{ fontSize: 12, color: TEXT_MUTED }}>{e.time} · {e.loc}</div>
+                  </div>
+                  <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: e.type === "Run" ? ORANGE_DIM : "rgba(139,92,246,0.15)", color: e.type === "Run" ? ORANGE : "#a78bfa", fontWeight: 600, flexShrink: 0 }}>{e.type}</span>
                 </Card>
               ))}
             </div>
@@ -574,29 +648,27 @@ export default function App() {
                 const cf = cheerForm[r.name] || { mile: "", location: "" };
                 return (
                   <Card key={r.name + idx}>
-                    {/* Top row */}
-                    <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: signups.length > 0 || cheerSpots.length > 0 ? 12 : 0 }}>
-                      <div style={{ minWidth: 52, textAlign: "center" }}>
+                    <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: signups.length > 0 || cheerSpots.length > 0 ? 12 : 0 }}>
+                      <div style={{ minWidth: 44, textAlign: "center", flexShrink: 0 }}>
                         <div style={{ fontSize: 10, color: TEXT_MUTED, textTransform: "uppercase", letterSpacing: 1 }}>{r.date.split(" ")[0]}</div>
-                        <div style={{ fontSize: 22, fontWeight: 800, color: ORANGE }}>{r.date.split(" ")[1]?.replace(",","")}</div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: ORANGE }}>{r.date.split(" ")[1]?.replace(",","")}</div>
                       </div>
-                      <div style={{ flex: 1 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginBottom: 2 }}>{r.name}</div>
                         <div style={{ fontSize: 12, color: TEXT_MUTED }}>{r.dist} · {r.loc}</div>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
                         {currentUser ? (
-                          <button onClick={() => handleRaceSignup(r.name)} style={{ fontSize: 12, padding: "5px 14px", borderRadius: 20, border: isIn ? `1.5px solid ${ORANGE}` : `1px solid ${CARD_BORDER}`, background: isIn ? ORANGE_DIM : "transparent", color: isIn ? ORANGE : TEXT_MUTED, cursor: "pointer", fontWeight: 600 }}>
+                          <button onClick={() => handleRaceSignup(r.name)} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 20, border: isIn ? `1.5px solid ${ORANGE}` : `1px solid ${CARD_BORDER}`, background: isIn ? ORANGE_DIM : "transparent", color: isIn ? ORANGE : TEXT_MUTED, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
                             {isIn ? "I'm in ✓" : "I'm running this"}
                           </button>
                         ) : (
-                          <span onClick={() => { setAuthMode("login"); setShowAuthModal(true); }} style={{ fontSize: 12, padding: "5px 14px", borderRadius: 20, border: `1px solid ${CARD_BORDER}`, color: TEXT_DIM, cursor: "pointer" }}>Sign in to join</span>
+                          <span onClick={() => { setAuthMode("login"); setShowAuthModal(true); }} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 20, border: `1px solid ${CARD_BORDER}`, color: TEXT_DIM, cursor: "pointer", whiteSpace: "nowrap" }}>Sign in to join</span>
                         )}
                         <span style={{ fontSize: 11, color: TEXT_DIM }}>{signups.length} going</span>
                       </div>
                     </div>
 
-                    {/* Runners list */}
                     {signups.length > 0 && (
                       <div style={{ marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${CARD_BORDER}` }}>
                         <div style={{ fontSize: 11, color: TEXT_MUTED, fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>Running</div>
@@ -611,43 +683,39 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* Cheer spots */}
                     <div style={{ paddingTop: 10, borderTop: `1px solid ${CARD_BORDER}` }}>
                       <div style={{ fontSize: 11, color: TEXT_MUTED, fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.8 }}>
                         Cheer Spots {cheerSpots.length > 0 && <span style={{ color: TEXT_DIM, fontWeight: 400 }}>· {cheerSpots.length}</span>}
                       </div>
                       {cheerSpots.length > 0 && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
                           {cheerSpots.map((s, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: TEXT_MUTED }}>
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: TEXT_MUTED, flexWrap: "wrap" }}>
                               <Avatar name={s.name} size={22} />
                               <span style={{ color: TEXT, fontWeight: 600 }}>{s.name}</span>
-                              <span>·</span>
-                              <span>Mile {s.mile}</span>
-                              <span>—</span>
-                              <span style={{ flex: 1 }}>{s.location}</span>
+                              <span style={{ color: TEXT_DIM }}>Mile {s.mile} — {s.location}</span>
                               {adminUnlocked && (
-                                <span onClick={() => handleRemoveCheerSpot(r.name, i)} style={{ fontSize: 11, color: "#f87171", cursor: "pointer", marginLeft: 4 }}>×</span>
+                                <span onClick={() => handleRemoveCheerSpot(r.name, i)} style={{ fontSize: 11, color: "#f87171", cursor: "pointer" }}>×</span>
                               )}
                             </div>
                           ))}
                         </div>
                       )}
                       {currentUser ? (
-                        <div style={{ display: "flex", gap: 6 }}>
+                        <div style={{ display: "flex", gap: 6, flexWrap: isMobile ? "wrap" : "nowrap" }}>
                           <input
                             value={cf.mile}
                             onChange={e => setCheerForm(prev => ({ ...prev, [r.name]: { ...cf, mile: e.target.value } }))}
                             placeholder="Mile"
-                            style={{ fontSize: 12, padding: "6px 10px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "#111113", color: TEXT, width: 60, outline: "none" }}
+                            style={{ fontSize: 12, padding: "7px 10px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "#111113", color: TEXT, width: 60, outline: "none", flexShrink: 0 }}
                           />
                           <input
                             value={cf.location}
                             onChange={e => setCheerForm(prev => ({ ...prev, [r.name]: { ...cf, location: e.target.value } }))}
-                            placeholder="Location (e.g. Lafayette & Flatbush)"
-                            style={{ fontSize: 12, padding: "6px 10px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "#111113", color: TEXT, flex: 1, outline: "none" }}
+                            placeholder="e.g. Lafayette & Flatbush"
+                            style={{ fontSize: 12, padding: "7px 10px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "#111113", color: TEXT, flex: 1, minWidth: isMobile ? "100%" : 0, outline: "none" }}
                           />
-                          <button onClick={() => handleAddCheerSpot(r.name)} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 8, background: ORANGE, color: "#fff", border: "none", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>Add</button>
+                          <button onClick={() => handleAddCheerSpot(r.name)} style={{ fontSize: 12, padding: "7px 14px", borderRadius: 8, background: ORANGE, color: "#fff", border: "none", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>Add</button>
                         </div>
                       ) : (
                         <span onClick={() => { setAuthMode("login"); setShowAuthModal(true); }} style={{ fontSize: 12, color: TEXT_DIM, cursor: "pointer" }}>Sign in to add a cheer spot</span>
@@ -678,9 +746,9 @@ export default function App() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {sorted.map(a => (
                 <Card key={a.id} style={{ borderLeft: a.pinned ? `3px solid ${ORANGE}` : `1px solid ${CARD_BORDER}` }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                    <div>{a.pinned && <div style={{ fontSize: 10, color: ORANGE, fontWeight: 700, marginBottom: 3, textTransform: "uppercase", letterSpacing: 1 }}>📌 Pinned</div>}<div style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>{a.title}</div></div>
-                    {adminUnlocked && <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6, gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>{a.pinned && <div style={{ fontSize: 10, color: ORANGE, fontWeight: 700, marginBottom: 3, textTransform: "uppercase", letterSpacing: 1 }}>📌 Pinned</div>}<div style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>{a.title}</div></div>
+                    {adminUnlocked && <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                       <button onClick={() => persist({ ...data, announcements: data.announcements.map(x => x.id === a.id ? { ...x, pinned: !x.pinned } : x) })} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: `1px solid ${ORANGE_BORDER}`, background: ORANGE_DIM, color: ORANGE, cursor: "pointer" }}>{a.pinned ? "Unpin" : "Pin"}</button>
                       <button onClick={() => persist({ ...data, announcements: data.announcements.filter(x => x.id !== a.id) })} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.1)", color: "#f87171", cursor: "pointer" }}>Delete</button>
                     </div>}
@@ -699,17 +767,11 @@ export default function App() {
             <Card style={{ marginBottom: "1rem" }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginBottom: 10 }}>Share with the crew</div>
               {currentUser ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <Avatar name={currentUser.name} size={28} />
-                  <span style={{ fontSize: 13, color: TEXT, fontWeight: 600 }}>{currentUser.name}</span>
-                </div>
-              ) : (
-                <div style={{ marginBottom: 8, fontSize: 13, color: TEXT_DIM }}>
-                  <span onClick={() => { setAuthMode("login"); setShowAuthModal(true); }} style={{ color: ORANGE, cursor: "pointer", fontWeight: 600 }}>Sign in</span> to post to the feed.
-                </div>
-              )}
-              {currentUser && (
                 <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <Avatar name={currentUser.name} size={28} />
+                    <span style={{ fontSize: 13, color: TEXT, fontWeight: 600 }}>{currentUser.name}</span>
+                  </div>
                   <textarea value={feedText} onChange={e => setFeedText(e.target.value)} placeholder="How was the run? Share a moment..." rows={3} style={{ width: "100%", boxSizing: "border-box", fontSize: 13, padding: "8px 12px", borderRadius: 10, border: `1px solid ${CARD_BORDER}`, background: "#111113", color: TEXT, resize: "vertical", fontFamily: "inherit", marginBottom: 8, outline: "none" }} />
                   {feedPhoto && (
                     <div style={{ position: "relative", marginBottom: 8 }}>
@@ -723,6 +785,10 @@ export default function App() {
                     <Btn onClick={() => { if (!feedText.trim()) return; const d = new Date(); const ds = d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); const m = data.members.find(x => x.name.toLowerCase() === currentUser.name.toLowerCase()); persist({ ...data, feed: [{ id: Date.now(), author: currentUser.name, badge: m?.badge || "", text: feedText.trim(), date: ds, likes: 0, photo: feedPhoto }, ...data.feed] }); setFeedText(""); setFeedPhoto(null); }}>Post</Btn>
                   </div>
                 </>
+              ) : (
+                <div style={{ fontSize: 13, color: TEXT_DIM }}>
+                  <span onClick={() => { setAuthMode("login"); setShowAuthModal(true); }} style={{ color: ORANGE, cursor: "pointer", fontWeight: 600 }}>Sign in</span> to post to the feed.
+                </div>
               )}
             </Card>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -730,11 +796,11 @@ export default function App() {
                 <Card key={post.id}>
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
                     <Avatar name={post.author} size={40} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontWeight: 700, fontSize: 14, color: TEXT }}>{post.author}</span>{post.badge && <Badge text={post.badge} />}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><span style={{ fontWeight: 700, fontSize: 14, color: TEXT }}>{post.author}</span>{post.badge && <Badge text={post.badge} />}</div>
                       <div style={{ fontSize: 11, color: TEXT_DIM }}>{post.date}</div>
                     </div>
-                    {adminUnlocked && <button onClick={() => persist({ ...data, feed: data.feed.filter(p => p.id !== post.id) })} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.1)", color: "#f87171", cursor: "pointer" }}>Delete</button>}
+                    {adminUnlocked && <button onClick={() => persist({ ...data, feed: data.feed.filter(p => p.id !== post.id) })} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.1)", color: "#f87171", cursor: "pointer", flexShrink: 0 }}>Delete</button>}
                   </div>
                   <div style={{ fontSize: 14, color: TEXT_MUTED, lineHeight: 1.6, marginBottom: post.photo ? 10 : 0 }}>{post.text}</div>
                   {post.photo && <img src={post.photo} alt="" style={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 10, marginBottom: 10 }} />}
@@ -748,6 +814,7 @@ export default function App() {
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
