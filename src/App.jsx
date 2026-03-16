@@ -3,10 +3,10 @@ import { useState, useEffect, useRef } from "react";
 const ORANGE = "#E82A2A";
 const ORANGE_DIM = "rgba(232,42,42,0.15)";
 const ORANGE_BORDER = "rgba(232,42,42,0.4)";
-const BG = "#0e0e0f";
-const SIDEBAR_BG = "#141416";
-const CARD_BG = "#1a1a1e";
-const CARD_BORDER = "rgba(255,255,255,0.07)";
+const BG = "#080809";
+const SIDEBAR_BG = "rgba(10,8,8,0.95)";
+const CARD_BG = "#13100f";
+const CARD_BORDER = "rgba(255,255,255,0.06)";
 const TEXT = "#f0f0f0";
 const TEXT_MUTED = "#888";
 const TEXT_DIM = "#555";
@@ -330,7 +330,7 @@ export default function App() {
   if (!loaded) return <div style={{ background: BG, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_MUTED, fontSize: 14 }}>Loading...</div>;
 
   return (
-    <div style={{ background: BG, minHeight: "100vh", fontFamily: "'Inter', system-ui, sans-serif", color: TEXT }}>
+    <div style={{ background: `radial-gradient(ellipse at 15% 35%, rgba(200,28,28,0.22) 0%, transparent 52%), radial-gradient(ellipse at 85% 10%, rgba(180,18,18,0.16) 0%, transparent 45%), radial-gradient(ellipse at 65% 90%, rgba(220,38,38,0.13) 0%, transparent 42%), radial-gradient(ellipse at 40% 60%, rgba(140,8,8,0.1) 0%, transparent 38%), ${BG}`, backgroundAttachment: "fixed", minHeight: "100vh", width: "100%", overflowX: "hidden", fontFamily: "'Inter', system-ui, sans-serif", color: TEXT }}>
       {editSection && <AdminModal section={editSection.section} data={editSection.arr} onSave={arr => saveSection(editSection.section, arr)} onClose={() => setEditSection(null)} />}
 
       {showAuthModal && (
@@ -364,11 +364,13 @@ export default function App() {
 
       {/* Sidebar */}
       <div style={{
-        position: isMobile ? "fixed" : "fixed",
+        position: "fixed",
         top: 0, left: 0, bottom: 0,
         width: 240,
-        background: SIDEBAR_BG,
-        borderRight: `1px solid ${CARD_BORDER}`,
+        background: "rgba(10,7,7,0.92)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        borderRight: `1px solid rgba(232,42,42,0.12)`,
         display: "flex",
         flexDirection: "column",
         padding: "1.25rem 0",
@@ -418,9 +420,13 @@ export default function App() {
 
       {/* Top bar (always visible) */}
       <div style={{
-        position: "fixed", top: 0, left: 0, right: 0,
+        position: "fixed", top: 0, right: 0,
+        left: !isMobile && sidebarOpen ? 240 : 0,
+        transition: "left 0.25s ease",
         height: 56,
-        background: SIDEBAR_BG,
+        background: "rgba(8,6,6,0.85)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         borderBottom: `1px solid ${CARD_BORDER}`,
         display: "flex",
         alignItems: "center",
@@ -453,10 +459,12 @@ export default function App() {
       {/* Main content */}
       <div style={{
         marginTop: 56,
-        padding: isMobile ? "1rem" : "1.5rem 2rem",
-        maxWidth: 760,
-        width: "100%",
+        marginLeft: !isMobile && sidebarOpen ? 240 : 0,
+        transition: "margin-left 0.25s ease",
+        padding: isMobile ? "1.25rem 1rem" : "1.75rem 2.5rem",
+        minHeight: "calc(100vh - 56px)",
         boxSizing: "border-box",
+        width: !isMobile && sidebarOpen ? "calc(100% - 240px)" : "100%",
       }}>
 
         {/* Page header */}
