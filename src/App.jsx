@@ -264,25 +264,23 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const r5 = await window.storage.get("stuesdays_v5");
-        if (r5?.value) { setData(JSON.parse(r5.value)); setLoaded(true); return; }
-        const r4 = await window.storage.get("stuesdays_v4");
-        if (r4?.value) {
-          const old = JSON.parse(r4.value);
-          const migrated = { ...DEFAULT_DATA, ...old, accounts: [], raceSignups: {}, cheerSpots: {} };
-          setData(migrated);
-          await window.storage.set("stuesdays_v5", JSON.stringify(migrated));
-        }
-      } catch {}
-      setLoaded(true);
-    })();
+    try {
+      const r5 = localStorage.getItem("stuesdays_v5");
+      if (r5) { setData(JSON.parse(r5)); setLoaded(true); return; }
+      const r4 = localStorage.getItem("stuesdays_v4");
+      if (r4) {
+        const old = JSON.parse(r4);
+        const migrated = { ...DEFAULT_DATA, ...old, accounts: [], raceSignups: {}, cheerSpots: {} };
+        setData(migrated);
+        localStorage.setItem("stuesdays_v5", JSON.stringify(migrated));
+      }
+    } catch {}
+    setLoaded(true);
   }, []);
 
-  const persist = async nd => {
+  const persist = nd => {
     setData(nd);
-    try { await window.storage.set("stuesdays_v5", JSON.stringify(nd)); setSaveMsg("Saved!"); setTimeout(() => setSaveMsg(""), 2000); } catch {}
+    try { localStorage.setItem("stuesdays_v5", JSON.stringify(nd)); setSaveMsg("Saved!"); setTimeout(() => setSaveMsg(""), 2000); } catch {}
   };
 
   const saveSection = (sec, arr) => {
