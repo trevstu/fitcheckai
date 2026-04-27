@@ -1,104 +1,127 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = ''
+    req.on('data', chunk => { body += chunk.toString() })
+    req.on('end', () => { try { resolve(JSON.parse(body)) } catch (e) { reject(e) } })
+  })
+}
+
 export default defineConfig(({ mode }) => {
-const env = loadEnv(mode, process.cwd(), '')
+  const env = loadEnv(mode, process.cwd(), '')
 
-return {
-  server: { host: true },
-  plugins: [
-    react(),
-    {
-      name: 'fit-check-api',
-      configureServer(server) {
-        server.middlewares.use('/api/analyze-fit', (req, res) => {
-          if (req.method !== 'POST') {
-            res.writeHead(405)
-            res.end(JSON.stringify({ error: 'Method not allowed' }))
-            return
-          }
+  return {
+    server: { host: true },
+    plugins: [
+      react(),
+      {
+        name: 'fitcheck-api',
+        configureServer(server) {
 
-          let body = ''
-          req.on('data', (chunk) => { body += chunk.toString() })
-          req.on('end', async () => {
+          // analyze-fit
+          server.middlewares.use('/api/analyze-fit', async (req, res) => {
+            if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({ error: 'Method not allowed' })); return }
             try {
-              const { base64Image, mimeType } = JSON.parse(body)
-
+              const { base64Image, mimeType, category, stylePrompt, inspirationImage } = await readBody(req)
               const { default: Anthropic } = await import('@anthropic-ai/sdk')
-              const key = env.ANTHROPIC_API_KEY || ''
-              console.log('[fit-check-api] key starts:', key.slice(0, 20), '| ends:', key.slice(-6), '| length:', key.length)
-              const client = new Anthropic({ apiKey: key })
+              const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
+
+              const content = [
+                { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image.replace(/^data:[^;]+;base64,/, '') } }
+              ]
+
+              if (inspirationImage) {
+                content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: inspirationImage.replace(/^data:[^;]+;base64,/, '') } })
+                content.push({ type: 'text', text: '(Second image above is their style inspiration reference.)' })
+              }
+
+              const contextLines = []
+              if (category) contextLines.push(`Style category: ${category}`)
+              if (stylePrompt) contextLines.push(`What they're going for: "${stylePrompt}"`)
+              const contextStr = contextLines.length ? `\n\nUser context:\n${contextLines.join('\n')}` : ''
+
+              content.push({
+                type: 'text',
+                text: `You are a personal stylist — direct, warm, and sharp. Analyze the outfit in the first image.${contextStr}
+
+Your job is not to rate. Your job is to style.
+
+Keep all text SHORT and punchy — like texting a stylish friend. No long paragraphs.
+
+Return ONLY a raw JSON object (no markdown, no extra text):
+{
+  "vibe": "<2-3 word vibe label e.g. 'Off-Duty Cool' or 'Almost There'>",
+  "breakdown": {
+    "fit": "<one punchy sentence>",
+    "color": "<one punchy sentence>",
+    "styling": "<one punchy sentence>",
+    "vibe": "<one punchy sentence>"
+  },
+  "moves": [
+    {"action": "add", "item": "<specific item>", "reason": "<one short sentence>"},
+    {"action": "swap", "item": "<what to swap and for what>", "reason": "<one short sentence>"},
+    {"action": "remove", "item": "<specific item>", "reason": "<one short sentence>"}
+  ],
+  "highlight": "<what is genuinely working, one sentence>",
+  "question": "<one conversational follow-up question a stylist would ask, keep it casual>"
+}`
+              })
 
               const message = await client.messages.create({
                 model: 'claude-opus-4-6',
                 max_tokens: 1024,
-                messages: [
-                  {
-                    role: 'user',
-                    content: [
-                      {
-                        type: 'image',
-                        source: {
-                          type: 'base64',
-                          media_type: mimeType,
-                          data: base64Image.replace(/^data:[^;]+;base64,/, ''),
-                        },
-                      },
-                      {
-                        type: 'text',
-                        text: `You are a professional fashion stylist. Analyze the outfit in this image.
-Be honest, sophisticated, and slightly editorial.
-
-Scoring system — rate each category 1–10, then calculate the final score as a weighted average:
-  fit      × 0.35  (garment fit on the body — the single most important factor)
-  styling  × 0.25  (how pieces work together: layering, accessories, cohesion)
-  color    × 0.25  (palette harmony, contrast, complementary combinations)
-  vibe     × 0.15  (aesthetic coherence — does it tell a consistent story)
-
-Round the final score to one decimal place (e.g. 7.4).
-
-Return ONLY a raw JSON object with this exact structure (no markdown, no extra text):
-{
-  "score": <weighted average 1–10, one decimal>,
-  "scores": { "fit": <1-10>, "styling": <1-10>, "color": <1-10>, "vibe": <1-10> },
-  "verdict": "<2-4 word verdict>",
-  "breakdown": {
-    "fit": "...",
-    "color": "...",
-    "vibe": "...",
-    "styling": "..."
-  },
-  "highlight": "<what is working well>",
-  "fix": "<one specific actionable improvement>",
-  "overall": "<2-3 sentence honest take>",
-  "suggestion": {
-    "item": "<specific product name, e.g. 'Slim-fit white Oxford shirt'>",
-    "reason": "<1 sentence on why this piece would elevate or complement the outfit>",
-    "search": "<concise Google Shopping search query for this exact product>"
-  }
-}`,
-                      },
-                    ],
-                  },
-                ],
+                messages: [{ role: 'user', content }],
               })
 
-              const content = message.content[0].text
-              const jsonMatch = content.match(/\{[\s\S]*\}/)
-              if (!jsonMatch) throw new Error('Could not parse AI response')
-              const parsed = JSON.parse(jsonMatch[0])
-
+              const text = message.content[0].text
+              const match = text.match(/\{[\s\S]*\}/)
+              if (!match) throw new Error('Could not parse response')
               res.writeHead(200, { 'Content-Type': 'application/json' })
-              res.end(JSON.stringify(parsed))
+              res.end(JSON.stringify(JSON.parse(match[0])))
             } catch (err) {
-              console.error('[fit-check-api]', err.message)
+              console.error('[analyze-fit]', err.message)
               res.writeHead(500, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify({ error: err.message }))
             }
           })
-        })
+
+          // chat
+          server.middlewares.use('/api/chat', async (req, res) => {
+            if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({ error: 'Method not allowed' })); return }
+            try {
+              const { messages, context } = await readBody(req)
+              const { default: Anthropic } = await import('@anthropic-ai/sdk')
+              const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
+
+              const system = `You are a personal stylist — direct, warm, and fun. You already analyzed this person's outfit.
+
+Context:
+- Style category: ${context.category || 'not specified'}
+- What they're going for: ${context.stylePrompt || 'not specified'}
+- Your initial analysis: ${JSON.stringify(context.analysis)}
+
+Keep ALL responses SHORT — 2-4 sentences max. Like texting a stylish friend. Be direct and specific. Ask follow-up questions to learn about their closet, lifestyle, and style goals.`
+
+              const message = await client.messages.create({
+                model: 'claude-opus-4-6',
+                max_tokens: 512,
+                system,
+                messages,
+              })
+
+              res.writeHead(200, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ reply: message.content[0].text }))
+            } catch (err) {
+              console.error('[chat]', err.message)
+              res.writeHead(500, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: err.message }))
+            }
+          })
+
+        },
       },
-    },
-  ],
-}
+    ],
+  }
 })
