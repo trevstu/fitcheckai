@@ -12,6 +12,19 @@ const C = {
   muted: "#7A6B63",
 };
 
+function parseChatMessage(text) {
+  const parts = [];
+  const regex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let last = 0, match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) parts.push({ type: "text", content: text.slice(last, match.index) });
+    parts.push({ type: "link", label: match[1], query: match[2] });
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push({ type: "text", content: text.slice(last) });
+  return parts;
+}
+
 const CATEGORIES = [
   "Casual", "Streetwear", "Business Casual", "Chic",
   "Formal", "Athletic", "Date Night", "Going Out", "Festival", "Vintage",
@@ -406,7 +419,16 @@ export default function FitCheck() {
                         borderBottomRightRadius: msg.role === "user" ? 2 : 12,
                         borderBottomLeftRadius: msg.role === "assistant" ? 2 : 12,
                       }}>
-                        {msg.content}
+                        {parseChatMessage(msg.content).map((part, j) =>
+                          part.type === "link" ? (
+                            <a key={j} href={`https://www.google.com/search?q=${encodeURIComponent(part.query)}&tbm=shop`} target="_blank" rel="noopener noreferrer"
+                              style={{ color: msg.role === "user" ? "#93C5FD" : C.brownLight, textDecoration: "underline", textDecorationStyle: "dotted", cursor: "pointer" }}>
+                              {part.label}
+                            </a>
+                          ) : (
+                            <span key={j}>{part.content}</span>
+                          )
+                        )}
                       </div>
                     </div>
                   ))}

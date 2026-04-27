@@ -102,7 +102,9 @@ Context:
 - What they're going for: ${context.stylePrompt || 'not specified'}
 - Your initial analysis: ${JSON.stringify(context.analysis)}
 
-Keep ALL responses SHORT — 2-4 sentences max. Like texting a stylish friend. Be direct and specific. Ask follow-up questions to learn about their closet, lifestyle, and style goals.`
+Keep ALL responses SHORT — 2-4 sentences max. Like texting a stylish friend. Be direct and specific. Ask follow-up questions to learn about their closet, lifestyle, and style goals.
+
+When you mention a specific product or item the user could shop for, format it like this: [item name](search query) — for example: [slim white Oxford shirt](slim fit white oxford shirt mens). Only do this when it genuinely helps, not for every item mentioned.`
 
               const message = await client.messages.create({
                 model: 'claude-opus-4-6',
