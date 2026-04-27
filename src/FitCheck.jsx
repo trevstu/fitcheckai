@@ -124,6 +124,8 @@ export default function FitCheck() {
   const countdownRef = useRef(null);
   const streamRef = useRef(null);
   const recordingStartRef = useRef(null);
+  const frameCaptureRef = useRef([]);
+  const frameCaptureIntervalRef = useRef(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -154,21 +156,35 @@ export default function FitCheck() {
     }
   };
 
+  const captureFrameFromCamera = () => {
+    const video = liveVideoRef.current;
+    if (!video || video.readyState < 2) return;
+    const MAX = 720;
+    let w = video.videoWidth, h = video.videoHeight;
+    if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+    else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(video, 0, 0, w, h);
+    frameCaptureRef.current.push(canvas.toDataURL("image/jpeg", 0.8));
+  };
+
   const startRecording = () => {
     chunksRef.current = [];
+    frameCaptureRef.current = [];
     const mr = new MediaRecorder(streamRef.current);
     mediaRecorderRef.current = mr;
     mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-    mr.onstop = async () => {
-      const elapsed = (Date.now() - recordingStartRef.current) / 1000;
-      const blob = new Blob(chunksRef.current, { type: "video/webm" });
+    mr.onstop = () => {
+      clearInterval(frameCaptureIntervalRef.current);
       stopStream();
-      const extracted = await extractFrames(blob, Math.min(elapsed, 15));
-      setFrames(extracted);
+      setFrames(frameCaptureRef.current.length > 0 ? [...frameCaptureRef.current] : null);
       setStage("configure");
     };
     mr.start();
     recordingStartRef.current = Date.now();
+    captureFrameFromCamera();
+    frameCaptureIntervalRef.current = setInterval(captureFrameFromCamera, 3000);
     setRecording(true);
     setCountdown(15);
     countdownRef.current = setInterval(() => {
@@ -181,6 +197,7 @@ export default function FitCheck() {
 
   const stopRecording = useCallback(() => {
     clearInterval(countdownRef.current);
+    clearInterval(frameCaptureIntervalRef.current);
     if (mediaRecorderRef.current?.state !== "inactive") mediaRecorderRef.current.stop();
     setRecording(false);
   }, []);
@@ -253,15 +270,13 @@ export default function FitCheck() {
   };
 
   const reset = () => {
-    stopStream(); clearInterval(countdownRef.current);
+    stopStream(); clearInterval(countdownRef.current); clearInterval(frameCaptureIntervalRef.current);
     setStage("upload"); setImage(null); setFrames(null); setInspirationImage(null);
     setCategory(null); setStylePrompt(""); setAnalysis(null);
     setError(null); setMessages([]); setChatInput(""); setShowInspiration(false);
     setRecording(false); setCountdown(15); setCameraError(null);
     [fileInputRef, videoFileRef, inspirationRef].forEach(r => { if (r.current) r.current.value = ""; });
   };
-
-  const previewSrc = frames?.[0] || image;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.black, fontFamily: "'Garamond','EB Garamond','Times New Roman',serif" }}>
