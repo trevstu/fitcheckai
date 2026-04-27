@@ -14,7 +14,7 @@ const C = {
 
 function parseChatMessage(text) {
   const parts = [];
-  const regex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const regex = /\[([^\]]+)\]\s*\(([^)]+)\)/g;
   let last = 0, match;
   while ((match = regex.exec(text)) !== null) {
     if (match.index > last) parts.push({ type: "text", content: text.slice(last, match.index) });
@@ -22,7 +22,7 @@ function parseChatMessage(text) {
     last = match.index + match[0].length;
   }
   if (last < text.length) parts.push({ type: "text", content: text.slice(last) });
-  return parts;
+  return parts.length ? parts : [{ type: "text", content: text }];
 }
 
 const CATEGORIES = [
@@ -416,6 +416,7 @@ export default function FitCheck() {
                         color: msg.role === "user" ? C.white : C.black,
                         border: msg.role === "user" ? "none" : `1px solid ${C.border}`,
                         fontSize: 13, fontFamily: "'Inter',sans-serif", fontWeight: 400, lineHeight: 1.55,
+                        whiteSpace: "pre-wrap",
                         borderBottomRightRadius: msg.role === "user" ? 2 : 12,
                         borderBottomLeftRadius: msg.role === "assistant" ? 2 : 12,
                       }}>
