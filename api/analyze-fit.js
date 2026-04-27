@@ -4,15 +4,14 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    const { base64Image, mimeType, category, stylePrompt, inspirationImage } = req.body
+    const { base64Image, mimeType, frames, isVideo, category, stylePrompt, inspirationImage } = req.body
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-    const content = [
-      {
-        type: 'image',
-        source: { type: 'base64', media_type: mimeType, data: base64Image.replace(/^data:[^;]+;base64,/, '') },
-      },
-    ]
+    const content = frames
+      ? frames.map(f => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.replace(/^data:[^;]+;base64,/, '') } }))
+      : [{ type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image.replace(/^data:[^;]+;base64,/, '') } }]
+
+    if (isVideo) content.push({ type: 'text', text: `(The ${frames.length} images above are evenly spaced frames from a short fit check video.)` })
 
     if (inspirationImage) {
       content.push({

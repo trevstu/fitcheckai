@@ -24,13 +24,15 @@ export default defineConfig(({ mode }) => {
           server.middlewares.use('/api/analyze-fit', async (req, res) => {
             if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({ error: 'Method not allowed' })); return }
             try {
-              const { base64Image, mimeType, category, stylePrompt, inspirationImage } = await readBody(req)
+              const { base64Image, mimeType, frames, isVideo, category, stylePrompt, inspirationImage } = await readBody(req)
               const { default: Anthropic } = await import('@anthropic-ai/sdk')
               const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
 
-              const content = [
-                { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image.replace(/^data:[^;]+;base64,/, '') } }
-              ]
+              const content = frames
+                ? frames.map(f => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.replace(/^data:[^;]+;base64,/, '') } }))
+                : [{ type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image.replace(/^data:[^;]+;base64,/, '') } }]
+
+              if (isVideo) content.push({ type: 'text', text: `(The ${frames.length} images above are evenly spaced frames from a short fit check video.)` })
 
               if (inspirationImage) {
                 content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: inspirationImage.replace(/^data:[^;]+;base64,/, '') } })
