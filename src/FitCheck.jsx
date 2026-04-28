@@ -282,19 +282,17 @@ export default function FitCheck() {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.black, fontFamily: "'Garamond','EB Garamond','Times New Roman',serif" }}>
       <style>{`
         @keyframes fc-spin  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes fc-fade  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fc-slide { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fc-fade  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fc-slide { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fc-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.4; transform:scale(0.8); } }
-        .fc-fade  { animation: fc-fade  0.4s ease forwards; }
-        .fc-slide { animation: fc-slide 0.35s ease forwards; }
-        .fc-upload-area:hover { border-color: ${C.taupe} !important; }
-        .fc-btn:hover   { background: ${C.black} !important; color: ${C.white} !important; }
+        .fc-fade  { animation: fc-fade  0.45s ease forwards; }
+        .fc-slide { animation: fc-slide 0.4s ease forwards; }
+        .fc-btn:hover     { opacity: 0.82 !important; }
         .fc-btn-inv:hover { background: ${C.white} !important; color: ${C.black} !important; }
-        .fc-back:hover  { color: ${C.brown} !important; }
-        .fc-cat:hover   { border-color: ${C.taupe} !important; }
-        .fc-send:hover  { opacity: 0.75; }
-        .fc-inspo:hover { color: ${C.brown} !important; }
-        .fc-option:hover { border-color: ${C.taupe} !important; color: ${C.black} !important; }
+        .fc-back:hover    { color: ${C.brown} !important; }
+        .fc-send:hover    { opacity: 0.75 !important; }
+        .fc-inspo:hover   { color: ${C.brown} !important; }
+        .fc-option:hover  { border-color: ${C.taupe} !important; color: ${C.black} !important; }
         .fc-categories { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
         .fc-categories::-webkit-scrollbar { display:none; }
         .fc-chat-input:focus { outline:none; border-color:${C.taupe} !important; }
@@ -319,7 +317,7 @@ export default function FitCheck() {
           <div style={{ fontSize: 26, fontWeight: 400, letterSpacing: "0.05em", color: C.black, fontStyle: "italic" }}>FitCheck</div>
         </div>
         {stage !== "upload" && (
-          <button onClick={reset} className="fc-back" style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.taupe, background: "none", border: "none", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400, transition: "color 0.2s" }}>
+          <button onClick={reset} className="fc-back" style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.taupe, background: "none", border: "none", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400, transition: "color 0.25s" }}>
             New Look
           </button>
         )}
@@ -332,7 +330,7 @@ export default function FitCheck() {
           <div className="fc-fade" style={{ paddingTop: 56, maxWidth: 520, margin: "0 auto" }}>
 
             {cameraError && (
-              <div style={{ padding: "12px 16px", background: C.white, border: `1px solid ${C.border}`, color: C.brown, fontSize: 12, fontFamily: "'Inter',sans-serif", marginBottom: 20, lineHeight: 1.6 }}>
+              <div style={{ padding: "14px 18px", background: C.white, border: `1px solid ${C.border}`, color: C.brown, fontSize: 12, fontFamily: "'Inter',sans-serif", marginBottom: 20, lineHeight: 1.6, borderRadius: 14 }}>
                 {cameraError}
               </div>
             )}
@@ -340,11 +338,10 @@ export default function FitCheck() {
             {/* Record — primary CTA */}
             <button
               onClick={startCamera}
-              style={{ width: "100%", padding: "28px 20px", background: C.black, color: C.white, border: "none", borderRadius: 2, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 16, transition: "opacity 0.2s" }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              className="fc-btn"
+              style={{ width: "100%", padding: "32px 20px", background: C.black, color: C.white, border: "none", borderRadius: 20, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 16, transition: "opacity 0.25s" }}
             >
-              <div style={{ fontSize: 22, fontStyle: "italic", fontWeight: 400, letterSpacing: "0.02em" }}>Record your fit check</div>
+              <div style={{ fontSize: 24, fontStyle: "italic", fontWeight: 400, letterSpacing: "0.02em" }}>Record your fit check</div>
               <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", fontFamily: "'Inter',sans-serif", fontWeight: 400 }}>Up to 15 seconds</div>
             </button>
 
@@ -361,14 +358,14 @@ export default function FitCheck() {
               <button
                 className="fc-option"
                 onClick={() => fileInputRef.current?.click()}
-                style={{ padding: "16px", background: C.white, color: C.taupe, border: `1px solid ${C.border}`, borderRadius: 2, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400, transition: "border-color 0.2s, color 0.2s" }}
+                style={{ padding: "18px", background: C.white, color: C.taupe, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400, transition: "border-color 0.25s, color 0.25s" }}
               >
                 Upload Photo
               </button>
               <button
                 className="fc-option"
                 onClick={() => videoFileRef.current?.click()}
-                style={{ padding: "16px", background: C.white, color: C.taupe, border: `1px solid ${C.border}`, borderRadius: 2, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400, transition: "border-color 0.2s, color 0.2s" }}
+                style={{ padding: "18px", background: C.white, color: C.taupe, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400, transition: "border-color 0.25s, color 0.25s" }}
               >
                 Upload Video
               </button>
@@ -379,7 +376,7 @@ export default function FitCheck() {
         {/* ── RECORDING ── */}
         {stage === "recording" && (
           <div className="fc-fade" style={{ paddingTop: 24, maxWidth: 520, margin: "0 auto" }}>
-            <div style={{ position: "relative", background: C.black, overflow: "hidden", borderRadius: 2 }}>
+            <div style={{ position: "relative", background: C.black, overflow: "hidden", borderRadius: 20 }}>
               <video
                 ref={liveVideoRef}
                 autoPlay playsInline muted
@@ -399,21 +396,21 @@ export default function FitCheck() {
               {!recording ? (
                 <button
                   onClick={startRecording}
-                  style={{ flex: 1, padding: "16px", background: "#EF4444", color: C.white, border: "none", borderRadius: 2, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400 }}
+                  style={{ flex: 1, padding: "16px", background: "#EF4444", color: C.white, border: "none", borderRadius: 14, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400, transition: "opacity 0.25s" }}
                 >
                   Record
                 </button>
               ) : (
                 <button
                   onClick={stopRecording}
-                  style={{ flex: 1, padding: "16px", background: C.black, color: C.white, border: "none", borderRadius: 2, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400 }}
+                  style={{ flex: 1, padding: "16px", background: C.black, color: C.white, border: "none", borderRadius: 14, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400, transition: "opacity 0.25s" }}
                 >
                   Stop
                 </button>
               )}
               <button
                 onClick={() => { stopStream(); clearInterval(countdownRef.current); setRecording(false); setStage("upload"); }}
-                style={{ padding: "16px 20px", background: C.white, color: C.taupe, border: `1px solid ${C.border}`, borderRadius: 2, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400 }}
+                style={{ padding: "16px 20px", background: C.white, color: C.taupe, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400 }}
               >
                 Cancel
               </button>
@@ -430,13 +427,13 @@ export default function FitCheck() {
               {frames ? (
                 <div style={{ display: "flex", gap: 3, flex: "0 0 auto" }}>
                   {[0, 2, 4].map(i => frames[i] && (
-                    <div key={i} style={{ width: 56, aspectRatio: "9/16", overflow: "hidden", background: C.card }}>
+                    <div key={i} style={{ width: 56, aspectRatio: "9/16", overflow: "hidden", background: C.card, borderRadius: 10 }}>
                       <img src={frames[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ flex: "0 0 90px", aspectRatio: "3/4", overflow: "hidden", background: C.card }}>
+                <div style={{ flex: "0 0 90px", aspectRatio: "3/4", overflow: "hidden", background: C.card, borderRadius: 12 }}>
                   <img src={image} alt="Your fit" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 </div>
               )}
@@ -451,7 +448,7 @@ export default function FitCheck() {
             </div>
 
             {error && (
-              <div style={{ padding: "12px 16px", background: C.white, border: `1px solid ${C.border}`, color: C.brown, fontSize: 12, fontFamily: "'Inter',sans-serif", marginBottom: 20 }}>
+              <div style={{ padding: "14px 18px", background: C.white, border: `1px solid ${C.border}`, color: C.brown, fontSize: 12, fontFamily: "'Inter',sans-serif", marginBottom: 20, borderRadius: 14 }}>
                 {error}
               </div>
             )}
@@ -461,8 +458,8 @@ export default function FitCheck() {
               <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 12 }}>Style Category</div>
               <div className="fc-categories">
                 {CATEGORIES.map(cat => (
-                  <button key={cat} className="fc-cat" onClick={() => setCategory(cat === category ? null : cat)}
-                    style={{ padding: "7px 16px", borderRadius: 100, border: `1px solid ${category === cat ? C.black : C.border}`, background: category === cat ? C.black : C.white, color: category === cat ? C.white : C.taupe, fontSize: 11, fontFamily: "'Inter',sans-serif", fontWeight: 400, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s" }}>
+                  <button key={cat} onClick={() => setCategory(cat === category ? null : cat)}
+                    style={{ padding: "8px 18px", borderRadius: 100, border: `1px solid ${category === cat ? C.black : C.border}`, background: category === cat ? C.black : C.white, color: category === cat ? C.white : C.taupe, fontSize: 11, fontFamily: "'Inter',sans-serif", fontWeight: 400, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s" }}>
                     {cat}
                   </button>
                 ))}
@@ -474,14 +471,14 @@ export default function FitCheck() {
               <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 12 }}>What's the look?</div>
               <textarea className="fc-textarea" value={stylePrompt} onChange={e => setStylePrompt(e.target.value)}
                 placeholder="e.g. going for a clean minimal vibe, dinner with friends…" rows={3}
-                style={{ width: "100%", padding: "12px 14px", border: `1px solid ${C.border}`, background: C.white, fontSize: 13, fontFamily: "'Inter',sans-serif", fontWeight: 400, color: C.black, lineHeight: 1.6, resize: "none", borderRadius: 2, boxSizing: "border-box", transition: "border-color 0.2s" }}
+                style={{ width: "100%", padding: "14px 16px", border: `1px solid ${C.border}`, background: C.white, fontSize: 13, fontFamily: "'Inter',sans-serif", fontWeight: 400, color: C.black, lineHeight: 1.6, resize: "none", borderRadius: 14, boxSizing: "border-box", transition: "border-color 0.25s" }}
               />
             </div>
 
             {/* Inspiration */}
             <div style={{ marginBottom: 36 }}>
               <button className="fc-inspo" onClick={() => setShowInspiration(v => !v)}
-                style={{ background: "none", border: "none", padding: 0, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.taupe, fontFamily: "'Inter',sans-serif", fontWeight: 400, cursor: "pointer", transition: "color 0.2s" }}>
+                style={{ background: "none", border: "none", padding: 0, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.taupe, fontFamily: "'Inter',sans-serif", fontWeight: 400, cursor: "pointer", transition: "color 0.25s" }}>
                 {showInspiration ? "− Remove Inspiration" : "+ Add Inspiration Photo"}
               </button>
               {showInspiration && (
@@ -489,7 +486,7 @@ export default function FitCheck() {
                   <input type="file" ref={inspirationRef} onChange={handleInspirationFile} accept="image/*" style={{ display: "none" }} />
                   {inspirationImage ? (
                     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                      <div style={{ width: 64, height: 64, overflow: "hidden", background: C.card }}>
+                      <div style={{ width: 64, height: 64, overflow: "hidden", background: C.card, borderRadius: 10 }}>
                         <img src={inspirationImage} alt="Inspiration" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       </div>
                       <button onClick={() => { setInspirationImage(null); if (inspirationRef.current) inspirationRef.current.value = ""; }}
@@ -498,7 +495,7 @@ export default function FitCheck() {
                       </button>
                     </div>
                   ) : (
-                    <div onClick={() => inspirationRef.current?.click()} style={{ border: `1px dashed ${C.border}`, padding: "20px", textAlign: "center", cursor: "pointer", background: C.white }}>
+                    <div onClick={() => inspirationRef.current?.click()} style={{ border: `1px dashed ${C.border}`, padding: "22px", textAlign: "center", cursor: "pointer", background: C.white, borderRadius: 14 }}>
                       <div style={{ fontSize: 12, color: C.taupe, fontFamily: "'Inter',sans-serif", fontWeight: 400 }}>Tap to upload inspiration photo</div>
                     </div>
                   )}
@@ -507,7 +504,7 @@ export default function FitCheck() {
             </div>
 
             <button onClick={analyze} className="fc-btn"
-              style={{ width: "100%", padding: "14px", background: C.black, color: C.white, border: `1px solid ${C.black}`, fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400, transition: "opacity 0.2s", borderRadius: 2 }}>
+              style={{ width: "100%", padding: "16px", background: C.black, color: C.white, border: `1px solid ${C.black}`, fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Inter',sans-serif", fontWeight: 400, transition: "opacity 0.25s", borderRadius: 14 }}>
               Analyze My Fit
             </button>
           </div>
@@ -516,7 +513,7 @@ export default function FitCheck() {
         {/* ── ANALYZING ── */}
         {stage === "analyzing" && (
           <div className="fc-fade" style={{ paddingTop: 80, display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-            <div style={{ width: 28, height: 28, border: `1px solid ${C.muted}`, borderTopColor: C.brown, borderRadius: "50%", animation: "fc-spin 0.9s linear infinite" }} />
+            <div style={{ width: 28, height: 28, border: `2px solid ${C.muted}`, borderTopColor: C.brown, borderRadius: "50%", animation: "fc-spin 0.9s linear infinite" }} />
             <div style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: C.taupe, fontFamily: "'Inter',sans-serif", fontWeight: 400 }}>
               {frames ? "Reading your video…" : "Reading your fit…"}
             </div>
@@ -533,22 +530,22 @@ export default function FitCheck() {
                 {frames ? "Submitted Video" : "Submitted Look"}
               </div>
               {frames ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
                   {frames.slice(0, 4).map((f, i) => (
-                    <div key={i} style={{ aspectRatio: "9/16", overflow: "hidden", background: C.card }}>
+                    <div key={i} style={{ aspectRatio: "9/16", overflow: "hidden", background: C.card, borderRadius: 12 }}>
                       <img src={f} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.card }}>
+                <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.card, borderRadius: 16 }}>
                   <img src={image} alt="Your fit" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 </div>
               )}
               {inspirationImage && (
-                <div style={{ marginTop: 12 }}>
+                <div style={{ marginTop: 14 }}>
                   <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 8 }}>Inspiration</div>
-                  <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.card }}>
+                  <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.card, borderRadius: 16 }}>
                     <img src={inspirationImage} alt="Inspiration" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   </div>
                 </div>
@@ -559,9 +556,9 @@ export default function FitCheck() {
             <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
 
               {/* Vibe */}
-              <div style={{ paddingBottom: 24, borderBottom: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 8 }}>The Vibe</div>
-                <div style={{ fontSize: 36, fontStyle: "italic", fontWeight: 400, color: C.black, letterSpacing: "0.02em" }}>{analysis.vibe}</div>
+              <div style={{ paddingBottom: 28, borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 10 }}>The Vibe</div>
+                <div style={{ fontSize: 52, fontStyle: "italic", fontWeight: 700, color: C.black, letterSpacing: "-0.01em", lineHeight: 1.05 }}>{analysis.vibe}</div>
               </div>
 
               {/* Moves */}
@@ -571,10 +568,10 @@ export default function FitCheck() {
                   {(analysis.moves || []).map((move, i) => {
                     const s = ACTION_STYLE[move.action] || ACTION_STYLE.swap;
                     return (
-                      <div key={i} style={{ padding: "14px 16px", background: s.bg, display: "flex", gap: 12, alignItems: "flex-start" }}>
-                        <span style={{ fontSize: 9, letterSpacing: "0.2em", color: s.color, fontFamily: "'Inter',sans-serif", fontWeight: 400, textTransform: "uppercase", paddingTop: 2, flexShrink: 0 }}>{s.label}</span>
+                      <div key={i} style={{ padding: "16px 18px", background: s.bg, display: "flex", gap: 14, alignItems: "flex-start", borderRadius: 14, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                        <span style={{ fontSize: 9, letterSpacing: "0.2em", color: s.color, fontFamily: "'Inter',sans-serif", fontWeight: 600, textTransform: "uppercase", paddingTop: 3, flexShrink: 0 }}>{s.label}</span>
                         <div>
-                          <div style={{ fontSize: 13, color: C.black, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 2 }}>{move.item}</div>
+                          <div style={{ fontSize: 13, color: C.black, fontFamily: "'Inter',sans-serif", fontWeight: 500, marginBottom: 3 }}>{move.item}</div>
                           <div style={{ fontSize: 12, color: C.taupe, fontFamily: "'Inter',sans-serif", fontWeight: 400, lineHeight: 1.5 }}>{move.reason}</div>
                         </div>
                       </div>
@@ -586,10 +583,10 @@ export default function FitCheck() {
               {/* Breakdown */}
               <div>
                 <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 14 }}>Breakdown</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: C.border }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   {Object.entries(analysis.breakdown || {}).map(([key, val]) => (
-                    <div key={key} style={{ padding: "14px 16px", background: C.white }}>
-                      <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 5 }}>{key}</div>
+                    <div key={key} style={{ padding: "16px 18px", background: C.white, borderRadius: 14, border: `1px solid ${C.border}` }}>
+                      <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 6 }}>{key}</div>
                       <div style={{ fontSize: 12, color: C.black, fontFamily: "'Inter',sans-serif", fontWeight: 400, lineHeight: 1.5 }}>{val}</div>
                     </div>
                   ))}
@@ -597,9 +594,9 @@ export default function FitCheck() {
               </div>
 
               {/* Highlight */}
-              <div style={{ borderLeft: `2px solid ${C.brownLight}`, paddingLeft: 16 }}>
-                <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.brownLight, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 6 }}>What's Working</div>
-                <div style={{ fontSize: 13, color: C.black, fontFamily: "'Inter',sans-serif", fontWeight: 400, lineHeight: 1.6 }}>{analysis.highlight}</div>
+              <div style={{ borderLeft: `3px solid ${C.brownLight}`, paddingLeft: 18 }}>
+                <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.brownLight, fontFamily: "'Inter',sans-serif", fontWeight: 400, marginBottom: 7 }}>What's Working</div>
+                <div style={{ fontSize: 14, color: C.black, fontFamily: "'Inter',sans-serif", fontWeight: 400, lineHeight: 1.6 }}>{analysis.highlight}</div>
               </div>
 
               {/* Chat */}
@@ -608,7 +605,7 @@ export default function FitCheck() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
                   {messages.map((msg, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                      <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: 12, background: msg.role === "user" ? C.black : C.white, color: msg.role === "user" ? C.white : C.black, border: msg.role === "user" ? "none" : `1px solid ${C.border}`, fontSize: 13, fontFamily: "'Inter',sans-serif", fontWeight: 400, lineHeight: 1.55, whiteSpace: "pre-wrap", borderBottomRightRadius: msg.role === "user" ? 2 : 12, borderBottomLeftRadius: msg.role === "assistant" ? 2 : 12 }}>
+                      <div style={{ maxWidth: "80%", padding: "11px 16px", borderRadius: 18, background: msg.role === "user" ? C.black : C.white, color: msg.role === "user" ? C.white : C.black, border: msg.role === "user" ? "none" : `1px solid ${C.border}`, fontSize: 13, fontFamily: "'Inter',sans-serif", fontWeight: 400, lineHeight: 1.55, whiteSpace: "pre-wrap", borderBottomRightRadius: msg.role === "user" ? 4 : 18, borderBottomLeftRadius: msg.role === "assistant" ? 4 : 18 }}>
                         {parseChatMessage(msg.content).map((part, j) =>
                           part.type === "link" ? (
                             <a key={j} href={`https://www.google.com/search?q=${encodeURIComponent(part.query)}&tbm=shop`} target="_blank" rel="noopener noreferrer"
@@ -622,7 +619,7 @@ export default function FitCheck() {
                   ))}
                   {chatLoading && (
                     <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                      <div style={{ padding: "12px 16px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, borderBottomLeftRadius: 2 }}>
+                      <div style={{ padding: "13px 18px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 18, borderBottomLeftRadius: 4 }}>
                         <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
                           {[0, 1, 2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: C.muted, animation: `fc-pulse 1.2s ease ${i * 0.2}s infinite` }} />)}
                         </div>
@@ -633,9 +630,9 @@ export default function FitCheck() {
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input className="fc-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Reply to your stylist…"
-                    style={{ flex: 1, padding: "11px 14px", border: `1px solid ${C.border}`, background: C.white, fontSize: 13, fontFamily: "'Inter',sans-serif", fontWeight: 400, color: C.black, borderRadius: 2, transition: "border-color 0.2s" }} />
+                    style={{ flex: 1, padding: "13px 20px", border: `1px solid ${C.border}`, background: C.white, fontSize: 13, fontFamily: "'Inter',sans-serif", fontWeight: 400, color: C.black, borderRadius: 26, transition: "border-color 0.25s" }} />
                   <button onClick={sendMessage} disabled={!chatInput.trim() || chatLoading} className="fc-send"
-                    style={{ padding: "11px 20px", background: C.black, color: C.white, border: "none", fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: chatInput.trim() ? "pointer" : "default", fontFamily: "'Inter',sans-serif", fontWeight: 400, opacity: chatInput.trim() ? 1 : 0.4, borderRadius: 2, transition: "opacity 0.2s" }}>
+                    style={{ padding: "13px 22px", background: C.black, color: C.white, border: "none", fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: chatInput.trim() ? "pointer" : "default", fontFamily: "'Inter',sans-serif", fontWeight: 400, opacity: chatInput.trim() ? 1 : 0.4, borderRadius: 26, transition: "opacity 0.25s" }}>
                     Send
                   </button>
                 </div>
