@@ -524,7 +524,15 @@ export default function FitCheck() {
 
         {/* ── RESULTS ── */}
         {stage === "results" && analysis && (
-          <div className="fc-fade fc-results-grid">
+          <div className="fc-fade">
+
+            {/* Vibe Hero */}
+            <div style={{ paddingTop: 48, paddingBottom: 32, borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>The Vibe</div>
+              <div style={{ fontSize: 72, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: C.text }}>{analysis.vibe}</div>
+            </div>
+
+          <div className="fc-results-grid">
 
             {/* Left */}
             <div className="fc-image-sticky">
@@ -556,12 +564,6 @@ export default function FitCheck() {
 
             {/* Right */}
             <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-
-              {/* Vibe */}
-              <div style={{ paddingBottom: 28, borderBottom: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 10 }}>The Vibe</div>
-                <div style={{ fontSize: 52, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.05, color: C.white }}>{analysis.vibe}</div>
-              </div>
 
               {/* Moves */}
               <div>
@@ -644,6 +646,7 @@ export default function FitCheck() {
               </div>
 
             </div>
+          </div>
           </div>
         )}
 
