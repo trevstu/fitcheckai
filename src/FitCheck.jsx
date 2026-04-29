@@ -623,7 +623,7 @@ export default function FitCheck() {
                   <input className="fc-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Reply to your stylist…"
                     style={{ flex: 1, padding: "13px 20px", border: `1px solid ${C.border}`, background: C.surface, fontSize: 13, fontWeight: 400, color: C.text, borderRadius: 26, transition: "border-color 0.25s" }} />
                   <button onClick={sendMessage} disabled={!chatInput.trim() || chatLoading} className="fc-send"
-                    style={{ padding: "13px 22px", background: C.purple, color: C.white, border: "none", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", cursor: chatInput.trim() ? "pointer" : "default", fontWeight: 600, opacity: chatInput.trim() ? 1 : 0.35, borderRadius: 26, transition: "opacity 0.25s" }}>
+                    style={{ padding: "13px 22px", background: "#6D28D9", color: C.white, border: "none", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", cursor: chatInput.trim() ? "pointer" : "default", fontWeight: 600, opacity: chatInput.trim() ? 1 : 0.35, borderRadius: 26, transition: "opacity 0.25s" }}>
                     Send
                   </button>
                 </div>
