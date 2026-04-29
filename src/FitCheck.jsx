@@ -314,7 +314,7 @@ export default function FitCheck() {
       <header className="fc-header-pad" style={{ padding: "20px 48px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 400, marginBottom: 3 }}>Style Analysis</div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: C.text }}>FitCheck</div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: C.text }}>STYLD</div>
         </div>
         {stage !== "upload" && (
           <button onClick={reset} className="fc-back" style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted, background: "none", border: "none", cursor: "pointer", fontWeight: 400, transition: "color 0.25s" }}>
@@ -626,9 +626,6 @@ export default function FitCheck() {
                     style={{ padding: "13px 22px", background: C.purple, color: C.white, border: "none", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", cursor: chatInput.trim() ? "pointer" : "default", fontWeight: 600, opacity: chatInput.trim() ? 1 : 0.35, borderRadius: 26, transition: "opacity 0.25s" }}>
                     Send
                   </button>
-                </div>
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 24, letterSpacing: "0.15em", fontWeight: 400, textTransform: "uppercase" }}>
-                  — FitCheck by Styld Studio
                 </div>
               </div>
 
