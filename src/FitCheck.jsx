@@ -1,16 +1,16 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
 const C = {
-  bg:            "#0F0F0F",
-  surface:       "#1A1A1A",
-  surfaceHigh:   "#222222",
+  bg:            "#F4F4F5",
+  surface:       "#FFFFFF",
+  surfaceHigh:   "#F0F0F1",
   purple:        "#8B5CF6",
   purpleLight:   "#A78BFA",
   white:         "#FFFFFF",
-  text:          "#FFFFFF",
-  textSecondary: "#A1A1AA",
-  border:        "#2A2A2A",
-  muted:         "#A1A1AA",
+  text:          "#0A0A0A",
+  textSecondary: "#71717A",
+  border:        "#E4E4E7",
+  muted:         "#71717A",
 };
 
 const CATEGORIES = [
@@ -19,9 +19,9 @@ const CATEGORIES = [
 ];
 
 const ACTION_STYLE = {
-  add:    { label: "ADD",    color: "#4ADE80", bg: "#052E16" },
-  swap:   { label: "SWAP",   color: "#FCD34D", bg: "#1C1400" },
-  remove: { label: "REMOVE", color: "#F87171", bg: "#1C0505" },
+  add:    { label: "ADD",    color: "#16A34A", bg: "#F0FDF4" },
+  swap:   { label: "SWAP",   color: "#D97706", bg: "#FFFBEB" },
+  remove: { label: "REMOVE", color: "#DC2626", bg: "#FFF1F2" },
 };
 
 function parseChatMessage(text) {
@@ -330,7 +330,7 @@ export default function FitCheck() {
           <div className="fc-fade" style={{ paddingTop: 56, maxWidth: 520, margin: "0 auto" }}>
 
             {cameraError && (
-              <div style={{ padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, color: "#F87171", fontSize: 12, marginBottom: 20, lineHeight: 1.6, borderRadius: 14 }}>
+              <div style={{ padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, color: "#DC2626", fontSize: 12, marginBottom: 20, lineHeight: 1.6, borderRadius: 14 }}>
                 {cameraError}
               </div>
             )}
@@ -450,7 +450,7 @@ export default function FitCheck() {
             </div>
 
             {error && (
-              <div style={{ padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, color: "#F87171", fontSize: 12, marginBottom: 20, borderRadius: 14 }}>
+              <div style={{ padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, color: "#DC2626", fontSize: 12, marginBottom: 20, borderRadius: 14 }}>
                 {error}
               </div>
             )}
@@ -573,7 +573,7 @@ export default function FitCheck() {
                       <div key={i} style={{ padding: "16px 18px", background: s.bg, display: "flex", gap: 14, alignItems: "flex-start", borderRadius: 14, border: `1px solid rgba(255,255,255,0.04)` }}>
                         <span style={{ fontSize: 9, letterSpacing: "0.2em", color: s.color, fontWeight: 700, textTransform: "uppercase", paddingTop: 3, flexShrink: 0 }}>{s.label}</span>
                         <div>
-                          <div style={{ fontSize: 13, color: C.white, fontWeight: 500, marginBottom: 3 }}>{move.item}</div>
+                          <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 3 }}>{move.item}</div>
                           <div style={{ fontSize: 12, color: C.muted, fontWeight: 400, lineHeight: 1.5 }}>{move.reason}</div>
                         </div>
                       </div>
