@@ -565,6 +565,12 @@ export default function FitCheck() {
             {/* Right */}
             <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
 
+              {/* Highlight */}
+              <div style={{ borderLeft: `3px solid ${C.purple}`, paddingLeft: 18 }}>
+                <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.purple, fontWeight: 600, marginBottom: 7 }}>What's Working</div>
+                <div style={{ fontSize: 14, color: C.text, fontWeight: 400, lineHeight: 1.6 }}>{analysis.highlight}</div>
+              </div>
+
               {/* Moves */}
               <div>
                 <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 14 }}>The Moves</div>
@@ -572,7 +578,7 @@ export default function FitCheck() {
                   {(analysis.moves || []).map((move, i) => {
                     const s = ACTION_STYLE[move.action] || ACTION_STYLE.swap;
                     return (
-                      <div key={i} style={{ padding: "16px 18px", background: s.bg, display: "flex", gap: 14, alignItems: "flex-start", borderRadius: 14, border: `1px solid rgba(255,255,255,0.04)` }}>
+                      <div key={i} style={{ padding: "16px 18px", background: s.bg, display: "flex", gap: 14, alignItems: "flex-start", borderRadius: 14, border: `1px solid rgba(0,0,0,0.04)` }}>
                         <span style={{ fontSize: 9, letterSpacing: "0.2em", color: s.color, fontWeight: 700, textTransform: "uppercase", paddingTop: 3, flexShrink: 0 }}>{s.label}</span>
                         <div>
                           <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 3 }}>{move.item}</div>
@@ -582,25 +588,6 @@ export default function FitCheck() {
                     );
                   })}
                 </div>
-              </div>
-
-              {/* Breakdown */}
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 14 }}>Breakdown</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {Object.entries(analysis.breakdown || {}).map(([key, val]) => (
-                    <div key={key} style={{ padding: "16px 18px", background: C.surface, borderRadius: 14, border: `1px solid ${C.border}` }}>
-                      <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 6 }}>{key}</div>
-                      <div style={{ fontSize: 12, color: C.text, fontWeight: 400, lineHeight: 1.5 }}>{val}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Highlight */}
-              <div style={{ borderLeft: `3px solid ${C.purple}`, paddingLeft: 18 }}>
-                <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.purple, fontWeight: 600, marginBottom: 7 }}>What's Working</div>
-                <div style={{ fontSize: 14, color: C.text, fontWeight: 400, lineHeight: 1.6 }}>{analysis.highlight}</div>
               </div>
 
               {/* Chat */}
