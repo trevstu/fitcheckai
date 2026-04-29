@@ -313,7 +313,6 @@ export default function FitCheck() {
       {/* Header */}
       <header className="fc-header-pad" style={{ padding: "20px 48px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <div style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 400, marginBottom: 3 }}>Style Analysis</div>
           <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: C.text }}>STYLD</div>
         </div>
         {stage !== "upload" && (
