@@ -314,7 +314,7 @@ export default function FitCheck() {
       <header className="fc-header-pad" style={{ padding: "20px 48px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 400, marginBottom: 3 }}>Style Analysis</div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: C.white }}>FitCheck</div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: C.text }}>FitCheck</div>
         </div>
         {stage !== "upload" && (
           <button onClick={reset} className="fc-back" style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted, background: "none", border: "none", cursor: "pointer", fontWeight: 400, transition: "color 0.25s" }}>
@@ -405,7 +405,7 @@ export default function FitCheck() {
                 <button
                   onClick={stopRecording}
                   className="fc-btn-primary"
-                  style={{ flex: 1, padding: "16px", background: C.surface, color: C.white, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontWeight: 500, transition: "opacity 0.25s" }}
+                  style={{ flex: 1, padding: "16px", background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontWeight: 500, transition: "opacity 0.25s" }}
                 >
                   Stop
                 </button>
@@ -529,7 +529,7 @@ export default function FitCheck() {
             {/* Vibe Hero */}
             <div style={{ paddingTop: 48, paddingBottom: 32, borderBottom: `1px solid ${C.border}` }}>
               <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>The Vibe</div>
-              <div style={{ fontSize: 72, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: C.text }}>{analysis.vibe}</div>
+              <div style={{ fontSize: 58, fontWeight: 400, fontStyle: "italic", fontFamily: "'EB Garamond','Garamond','Times New Roman',serif", letterSpacing: "0.01em", lineHeight: 1.1, color: C.text }}>{analysis.vibe}</div>
             </div>
 
           <div className="fc-results-grid">
@@ -609,7 +609,7 @@ export default function FitCheck() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
                   {messages.map((msg, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                      <div style={{ maxWidth: "80%", padding: "11px 16px", borderRadius: 18, background: msg.role === "user" ? C.purple : C.surface, color: C.white, border: msg.role === "user" ? "none" : `1px solid ${C.border}`, fontSize: 13, fontWeight: 400, lineHeight: 1.55, whiteSpace: "pre-wrap", borderBottomRightRadius: msg.role === "user" ? 4 : 18, borderBottomLeftRadius: msg.role === "assistant" ? 4 : 18 }}>
+                      <div style={{ maxWidth: "80%", padding: "11px 16px", borderRadius: 18, background: msg.role === "user" ? C.purple : C.surface, color: msg.role === "user" ? C.white : C.text, border: msg.role === "user" ? "none" : `1px solid ${C.border}`, fontSize: 13, fontWeight: 400, lineHeight: 1.55, whiteSpace: "pre-wrap", borderBottomRightRadius: msg.role === "user" ? 4 : 18, borderBottomLeftRadius: msg.role === "assistant" ? 4 : 18 }}>
                         {parseChatMessage(msg.content).map((part, j) =>
                           part.type === "link" ? (
                             <a key={j} href={`https://www.google.com/search?q=${encodeURIComponent(part.query)}&tbm=shop`} target="_blank" rel="noopener noreferrer"
