@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { supabase } from "./supabase";
 
 const C = {
   bg:            "#F4F4F5",
@@ -98,7 +99,7 @@ const extractFrames = (blob, knownDuration) => new Promise((resolve) => {
   video.load();
 });
 
-export default function FitCheck() {
+export default function FitCheck({ user, onSignOut }) {
   const [stage, setStage] = useState("upload");
   const [image, setImage] = useState(null);
   const [frames, setFrames] = useState(null);
@@ -114,6 +115,8 @@ export default function FitCheck() {
   const [recording, setRecording] = useState(false);
   const [countdown, setCountdown] = useState(15);
   const [cameraError, setCameraError] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const fileInputRef = useRef(null);
   const videoFileRef = useRef(null);
@@ -141,6 +144,28 @@ export default function FitCheck() {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
+  };
+
+  const loadHistory = useCallback(async () => {
+    if (!user) return;
+    setHistoryLoading(true);
+    const { data } = await supabase
+      .from("fit_history")
+      .select("id, image, frames, category, style_prompt, analysis, created_at")
+      .order("created_at", { ascending: false })
+      .limit(24);
+    setHistory(data || []);
+    setHistoryLoading(false);
+  }, [user]);
+
+  const viewHistoryItem = (item) => {
+    setImage(item.image);
+    setFrames(item.frames);
+    setCategory(item.category);
+    setStylePrompt(item.style_prompt || "");
+    setAnalysis(item.analysis);
+    setMessages([{ role: "assistant", content: item.analysis.question }]);
+    setStage("results");
   };
 
   const startCamera = async () => {
@@ -244,6 +269,17 @@ export default function FitCheck() {
       setAnalysis(data);
       setMessages([{ role: "assistant", content: data.question }]);
       setStage("results");
+
+      if (user) {
+        supabase.from("fit_history").insert({
+          user_id: user.id,
+          image: frames ? null : image,
+          frames: frames || null,
+          category,
+          style_prompt: stylePrompt,
+          analysis: data,
+        }).then(() => {});
+      }
     } catch (err) {
       setError(err.message);
       setStage("configure");
@@ -290,9 +326,10 @@ export default function FitCheck() {
         .fc-slide { animation: fc-slide 0.4s ease forwards; }
         .fc-btn-primary:hover  { opacity: 0.85 !important; }
         .fc-btn-surface:hover  { background: ${C.surfaceHigh} !important; border-color: ${C.purple} !important; }
-        .fc-back:hover         { color: ${C.white} !important; }
+        .fc-back:hover         { color: ${C.text} !important; }
         .fc-send:hover         { opacity: 0.8 !important; }
         .fc-inspo:hover        { color: ${C.purpleLight} !important; }
+        .fc-history-item:hover { opacity: 0.85; transform: translateY(-2px); }
         .fc-categories { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
         .fc-categories::-webkit-scrollbar { display:none; }
         .fc-chat-input:focus { outline:none; border-color:${C.purple} !important; }
@@ -301,10 +338,12 @@ export default function FitCheck() {
         .fc-textarea::placeholder { color:${C.muted}; }
         .fc-main { padding: 0 48px 80px; max-width: 1100px; margin: 0 auto; }
         .fc-results-grid { display:grid; grid-template-columns:1fr 1.5fr; gap:56px; align-items:start; padding-top:48px; }
+        .fc-history-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
         .fc-image-sticky { position:sticky; top:24px; }
         @media (max-width: 680px) {
           .fc-main { padding: 0 16px 60px; }
           .fc-results-grid { grid-template-columns:1fr; gap:28px; padding-top:24px; }
+          .fc-history-grid { grid-template-columns:repeat(2,1fr); }
           .fc-image-sticky { position:static; }
           .fc-header-pad { padding: 16px 20px !important; }
         }
@@ -312,14 +351,29 @@ export default function FitCheck() {
 
       {/* Header */}
       <header className="fc-header-pad" style={{ padding: "20px 48px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: C.text }}>STYLD</div>
+        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: C.text }}>STYLD</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          {user && stage === "upload" && (
+            <button onClick={() => { loadHistory(); setStage("history"); }} className="fc-back"
+              style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted, background: "none", border: "none", cursor: "pointer", fontWeight: 400, transition: "color 0.25s" }}>
+              History
+            </button>
+          )}
+          {stage !== "upload" && (
+            <button onClick={reset} className="fc-back"
+              style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted, background: "none", border: "none", cursor: "pointer", fontWeight: 400, transition: "color 0.25s" }}>
+              New Look
+            </button>
+          )}
+          {user && (
+            <button onClick={onSignOut}
+              style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: C.border, background: "none", border: "none", cursor: "pointer", fontWeight: 400, transition: "color 0.25s" }}
+              onMouseEnter={e => e.currentTarget.style.color = C.muted}
+              onMouseLeave={e => e.currentTarget.style.color = C.border}>
+              Sign Out
+            </button>
+          )}
         </div>
-        {stage !== "upload" && (
-          <button onClick={reset} className="fc-back" style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted, background: "none", border: "none", cursor: "pointer", fontWeight: 400, transition: "color 0.25s" }}>
-            New Look
-          </button>
-        )}
       </header>
 
       <main className="fc-main">
@@ -327,45 +381,30 @@ export default function FitCheck() {
         {/* ── UPLOAD ── */}
         {stage === "upload" && (
           <div className="fc-fade" style={{ paddingTop: 56, maxWidth: 520, margin: "0 auto" }}>
-
             {cameraError && (
               <div style={{ padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, color: "#DC2626", fontSize: 12, marginBottom: 20, lineHeight: 1.6, borderRadius: 14 }}>
                 {cameraError}
               </div>
             )}
-
-            {/* Record — primary CTA */}
-            <button
-              onClick={startCamera}
-              className="fc-btn-primary"
-              style={{ width: "100%", padding: "36px 20px", background: C.purple, color: C.white, border: "none", borderRadius: 20, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 12, transition: "opacity 0.25s" }}
-            >
+            <button onClick={startCamera} className="fc-btn-primary"
+              style={{ width: "100%", padding: "36px 20px", background: C.purple, color: C.white, border: "none", borderRadius: 20, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 12, transition: "opacity 0.25s" }}>
               <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>Record your fit check</div>
               <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.6)", fontWeight: 400 }}>Up to 15 seconds</div>
             </button>
-
-            {/* Secondary options */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
               <div style={{ flex: 1, height: 1, background: C.border }} />
               <div style={{ fontSize: 11, color: C.muted, fontWeight: 400, letterSpacing: "0.1em" }}>or</div>
               <div style={{ flex: 1, height: 1, background: C.border }} />
             </div>
-
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <input type="file" ref={fileInputRef} onChange={handleFile} accept="image/*" style={{ display: "none" }} />
               <input type="file" ref={videoFileRef} onChange={handleVideoFile} accept="video/*" style={{ display: "none" }} />
-              <button
-                className="fc-btn-surface"
-                onClick={() => fileInputRef.current?.click()}
-                style={{ padding: "18px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400, transition: "background 0.25s, border-color 0.25s" }}
-              >
+              <button className="fc-btn-surface" onClick={() => fileInputRef.current?.click()}
+                style={{ padding: "18px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400, transition: "background 0.25s, border-color 0.25s" }}>
                 Upload Photo
               </button>
-              <button
-                className="fc-btn-surface"
-                onClick={() => videoFileRef.current?.click()}
-                style={{ padding: "18px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400, transition: "background 0.25s, border-color 0.25s" }}
-              >
+              <button className="fc-btn-surface" onClick={() => videoFileRef.current?.click()}
+                style={{ padding: "18px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400, transition: "background 0.25s, border-color 0.25s" }}>
                 Upload Video
               </button>
             </div>
@@ -376,43 +415,28 @@ export default function FitCheck() {
         {stage === "recording" && (
           <div className="fc-fade" style={{ paddingTop: 24, maxWidth: 520, margin: "0 auto" }}>
             <div style={{ position: "relative", background: "#000", overflow: "hidden", borderRadius: 20 }}>
-              <video
-                ref={liveVideoRef}
-                autoPlay playsInline muted
-                style={{ width: "100%", display: "block", maxHeight: "65vh", objectFit: "cover" }}
-              />
+              <video ref={liveVideoRef} autoPlay playsInline muted style={{ width: "100%", display: "block", maxHeight: "65vh", objectFit: "cover" }} />
               {recording && (
                 <div style={{ position: "absolute", top: 16, left: 0, right: 0, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444", animation: "fc-pulse 1.2s ease infinite" }} />
-                  <span style={{ color: C.white, fontSize: 13, fontWeight: 500, letterSpacing: "0.1em" }}>
-                    {countdown}s
-                  </span>
+                  <span style={{ color: C.white, fontSize: 13, fontWeight: 500, letterSpacing: "0.1em" }}>{countdown}s</span>
                 </div>
               )}
             </div>
-
             <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
               {!recording ? (
-                <button
-                  onClick={startRecording}
-                  className="fc-btn-primary"
-                  style={{ flex: 1, padding: "16px", background: "#EF4444", color: C.white, border: "none", borderRadius: 14, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontWeight: 500, transition: "opacity 0.25s" }}
-                >
+                <button onClick={startRecording} className="fc-btn-primary"
+                  style={{ flex: 1, padding: "16px", background: "#EF4444", color: C.white, border: "none", borderRadius: 14, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontWeight: 500, transition: "opacity 0.25s" }}>
                   Record
                 </button>
               ) : (
-                <button
-                  onClick={stopRecording}
-                  className="fc-btn-primary"
-                  style={{ flex: 1, padding: "16px", background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontWeight: 500, transition: "opacity 0.25s" }}
-                >
+                <button onClick={stopRecording} className="fc-btn-primary"
+                  style={{ flex: 1, padding: "16px", background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontWeight: 500, transition: "opacity 0.25s" }}>
                   Stop
                 </button>
               )}
-              <button
-                onClick={() => { stopStream(); clearInterval(countdownRef.current); setRecording(false); setStage("upload"); }}
-                style={{ padding: "16px 20px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400 }}
-              >
+              <button onClick={() => { stopStream(); clearInterval(countdownRef.current); setRecording(false); setStage("upload"); }}
+                style={{ padding: "16px 20px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400 }}>
                 Cancel
               </button>
             </div>
@@ -422,8 +446,6 @@ export default function FitCheck() {
         {/* ── CONFIGURE ── */}
         {stage === "configure" && (
           <div className="fc-slide" style={{ paddingTop: 40, maxWidth: 600, margin: "0 auto" }}>
-
-            {/* Preview */}
             <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 32 }}>
               {frames ? (
                 <div style={{ display: "flex", gap: 3, flex: "0 0 auto" }}>
@@ -442,9 +464,7 @@ export default function FitCheck() {
                 <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: C.text, marginBottom: 6 }}>
                   {frames ? "Nice moves." : "Looking good."}
                 </div>
-                <div style={{ fontSize: 12, color: C.muted, fontWeight: 400, lineHeight: 1.7 }}>
-                  Tell your stylist a bit more for the best read.
-                </div>
+                <div style={{ fontSize: 12, color: C.muted, fontWeight: 400, lineHeight: 1.7 }}>Tell your stylist a bit more for the best read.</div>
               </div>
             </div>
 
@@ -454,7 +474,6 @@ export default function FitCheck() {
               </div>
             )}
 
-            {/* Category */}
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>Style Category</div>
               <div className="fc-categories">
@@ -467,16 +486,13 @@ export default function FitCheck() {
               </div>
             </div>
 
-            {/* Style prompt */}
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>What's the look?</div>
               <textarea className="fc-textarea" value={stylePrompt} onChange={e => setStylePrompt(e.target.value)}
                 placeholder="e.g. going for a clean minimal vibe, dinner with friends…" rows={3}
-                style={{ width: "100%", padding: "14px 16px", border: `1px solid ${C.border}`, background: C.surface, fontSize: 13, fontWeight: 400, color: C.text, lineHeight: 1.6, resize: "none", borderRadius: 14, boxSizing: "border-box", transition: "border-color 0.25s" }}
-              />
+                style={{ width: "100%", padding: "14px 16px", border: `1px solid ${C.border}`, background: C.surface, fontSize: 13, fontWeight: 400, color: C.text, lineHeight: 1.6, resize: "none", borderRadius: 14, boxSizing: "border-box", transition: "border-color 0.25s" }} />
             </div>
 
-            {/* Inspiration */}
             <div style={{ marginBottom: 36 }}>
               <button className="fc-inspo" onClick={() => setShowInspiration(v => !v)}
                 style={{ background: "none", border: "none", padding: 0, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted, fontWeight: 400, cursor: "pointer", transition: "color 0.25s" }}>
@@ -496,7 +512,8 @@ export default function FitCheck() {
                       </button>
                     </div>
                   ) : (
-                    <div onClick={() => inspirationRef.current?.click()} style={{ border: `1px dashed ${C.border}`, padding: "22px", textAlign: "center", cursor: "pointer", background: C.surface, borderRadius: 14 }}>
+                    <div onClick={() => inspirationRef.current?.click()}
+                      style={{ border: `1px dashed ${C.border}`, padding: "22px", textAlign: "center", cursor: "pointer", background: C.surface, borderRadius: 14 }}>
                       <div style={{ fontSize: 12, color: C.muted, fontWeight: 400 }}>Tap to upload inspiration photo</div>
                     </div>
                   )}
@@ -521,115 +538,141 @@ export default function FitCheck() {
           </div>
         )}
 
+        {/* ── HISTORY ── */}
+        {stage === "history" && (
+          <div className="fc-fade" style={{ paddingTop: 48 }}>
+            <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 24 }}>Your Fits</div>
+            {historyLoading ? (
+              <div style={{ display: "flex", justifyContent: "center", paddingTop: 40 }}>
+                <div style={{ width: 24, height: 24, border: `2px solid ${C.border}`, borderTopColor: C.purple, borderRadius: "50%", animation: "fc-spin 0.9s linear infinite" }} />
+              </div>
+            ) : history.length === 0 ? (
+              <div style={{ textAlign: "center", paddingTop: 60 }}>
+                <div style={{ fontSize: 16, fontWeight: 600, color: C.text, marginBottom: 8 }}>No fits yet</div>
+                <div style={{ fontSize: 13, color: C.muted }}>Submit your first look to get started.</div>
+              </div>
+            ) : (
+              <div className="fc-history-grid">
+                {history.map(item => {
+                  const thumb = item.frames?.[0] || item.image;
+                  const date = new Date(item.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                  return (
+                    <div key={item.id} className="fc-history-item" onClick={() => viewHistoryItem(item)}
+                      style={{ cursor: "pointer", transition: "opacity 0.2s, transform 0.2s" }}>
+                      <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 14, marginBottom: 8 }}>
+                        {thumb && <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 400, fontStyle: "italic", fontFamily: "'EB Garamond','Garamond',serif", color: C.text, marginBottom: 2 }}>{item.analysis?.vibe}</div>
+                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 400 }}>{date}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── RESULTS ── */}
         {stage === "results" && analysis && (
           <div className="fc-fade">
-
-            {/* Vibe Hero */}
             <div style={{ paddingTop: 48, paddingBottom: 32, borderBottom: `1px solid ${C.border}` }}>
               <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>The Vibe</div>
               <div style={{ fontSize: 58, fontWeight: 400, fontStyle: "italic", fontFamily: "'EB Garamond','Garamond','Times New Roman',serif", letterSpacing: "0.01em", lineHeight: 1.1, color: C.text }}>{analysis.vibe}</div>
             </div>
 
-          <div className="fc-results-grid">
-
-            {/* Left */}
-            <div className="fc-image-sticky">
-              <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>
-                {frames ? "Submitted Video" : "Submitted Look"}
-              </div>
-              {frames ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                  {frames.slice(0, 4).map((f, i) => (
-                    <div key={i} style={{ aspectRatio: "9/16", overflow: "hidden", background: C.surface, borderRadius: 12 }}>
-                      <img src={f} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    </div>
-                  ))}
+            <div className="fc-results-grid">
+              {/* Left */}
+              <div className="fc-image-sticky">
+                <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>
+                  {frames ? "Submitted Video" : "Submitted Look"}
                 </div>
-              ) : (
-                <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
-                  <img src={image} alt="Your fit" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                </div>
-              )}
-              {inspirationImage && (
-                <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>Inspiration</div>
+                {frames ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                    {frames.slice(0, 4).map((f, i) => (
+                      <div key={i} style={{ aspectRatio: "9/16", overflow: "hidden", background: C.surface, borderRadius: 12 }}>
+                        <img src={f} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                   <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
-                    <img src={inspirationImage} alt="Inspiration" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <img src={image} alt="Your fit" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  </div>
+                )}
+                {inspirationImage && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>Inspiration</div>
+                    <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
+                      <img src={inspirationImage} alt="Inspiration" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+                <div style={{ borderLeft: `3px solid ${C.purple}`, paddingLeft: 18 }}>
+                  <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.purple, fontWeight: 600, marginBottom: 7 }}>What's Working</div>
+                  <div style={{ fontSize: 14, color: C.text, fontWeight: 400, lineHeight: 1.6 }}>{analysis.highlight}</div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 14 }}>The Moves</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {(analysis.moves || []).map((move, i) => {
+                      const s = ACTION_STYLE[move.action] || ACTION_STYLE.swap;
+                      return (
+                        <div key={i} style={{ padding: "16px 18px", background: s.bg, display: "flex", gap: 14, alignItems: "flex-start", borderRadius: 14, border: `1px solid rgba(0,0,0,0.04)` }}>
+                          <span style={{ fontSize: 9, letterSpacing: "0.2em", color: s.color, fontWeight: 700, textTransform: "uppercase", paddingTop: 3, flexShrink: 0 }}>{s.label}</span>
+                          <div>
+                            <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 3 }}>{move.item}</div>
+                            <div style={{ fontSize: 12, color: C.muted, fontWeight: 400, lineHeight: 1.5 }}>{move.reason}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Right */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-
-              {/* Highlight */}
-              <div style={{ borderLeft: `3px solid ${C.purple}`, paddingLeft: 18 }}>
-                <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.purple, fontWeight: 600, marginBottom: 7 }}>What's Working</div>
-                <div style={{ fontSize: 14, color: C.text, fontWeight: 400, lineHeight: 1.6 }}>{analysis.highlight}</div>
-              </div>
-
-              {/* Moves */}
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 14 }}>The Moves</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {(analysis.moves || []).map((move, i) => {
-                    const s = ACTION_STYLE[move.action] || ACTION_STYLE.swap;
-                    return (
-                      <div key={i} style={{ padding: "16px 18px", background: s.bg, display: "flex", gap: 14, alignItems: "flex-start", borderRadius: 14, border: `1px solid rgba(0,0,0,0.04)` }}>
-                        <span style={{ fontSize: 9, letterSpacing: "0.2em", color: s.color, fontWeight: 700, textTransform: "uppercase", paddingTop: 3, flexShrink: 0 }}>{s.label}</span>
-                        <div>
-                          <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 3 }}>{move.item}</div>
-                          <div style={{ fontSize: 12, color: C.muted, fontWeight: 400, lineHeight: 1.5 }}>{move.reason}</div>
+                <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 28 }}>
+                  <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 16 }}>Your Stylist</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+                    {messages.map((msg, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                        <div style={{ maxWidth: "80%", padding: "11px 16px", borderRadius: 18, background: msg.role === "user" ? C.purple : C.surface, color: msg.role === "user" ? C.white : C.text, border: msg.role === "user" ? "none" : `1px solid ${C.border}`, fontSize: 13, fontWeight: 400, lineHeight: 1.55, whiteSpace: "pre-wrap", borderBottomRightRadius: msg.role === "user" ? 4 : 18, borderBottomLeftRadius: msg.role === "assistant" ? 4 : 18 }}>
+                          {parseChatMessage(msg.content).map((part, j) =>
+                            part.type === "link" ? (
+                              <a key={j} href={`https://www.google.com/search?q=${encodeURIComponent(part.query)}&tbm=shop`} target="_blank" rel="noopener noreferrer"
+                                style={{ color: msg.role === "user" ? "#C4B5FD" : C.purpleLight, textDecoration: "underline", textDecorationStyle: "dotted", cursor: "pointer" }}>
+                                {part.label}
+                              </a>
+                            ) : <span key={j}>{part.content}</span>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Chat */}
-              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 28 }}>
-                <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 16 }}>Your Stylist</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-                  {messages.map((msg, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                      <div style={{ maxWidth: "80%", padding: "11px 16px", borderRadius: 18, background: msg.role === "user" ? C.purple : C.surface, color: msg.role === "user" ? C.white : C.text, border: msg.role === "user" ? "none" : `1px solid ${C.border}`, fontSize: 13, fontWeight: 400, lineHeight: 1.55, whiteSpace: "pre-wrap", borderBottomRightRadius: msg.role === "user" ? 4 : 18, borderBottomLeftRadius: msg.role === "assistant" ? 4 : 18 }}>
-                        {parseChatMessage(msg.content).map((part, j) =>
-                          part.type === "link" ? (
-                            <a key={j} href={`https://www.google.com/search?q=${encodeURIComponent(part.query)}&tbm=shop`} target="_blank" rel="noopener noreferrer"
-                              style={{ color: msg.role === "user" ? "#C4B5FD" : C.purpleLight, textDecoration: "underline", textDecorationStyle: "dotted", cursor: "pointer" }}>
-                              {part.label}
-                            </a>
-                          ) : <span key={j}>{part.content}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {chatLoading && (
-                    <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                      <div style={{ padding: "13px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, borderBottomLeftRadius: 4 }}>
-                        <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                          {[0, 1, 2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: C.muted, animation: `fc-pulse 1.2s ease ${i * 0.2}s infinite` }} />)}
+                    ))}
+                    {chatLoading && (
+                      <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                        <div style={{ padding: "13px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, borderBottomLeftRadius: 4 }}>
+                          <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                            {[0, 1, 2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: C.muted, animation: `fc-pulse 1.2s ease ${i * 0.2}s infinite` }} />)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input className="fc-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Reply to your stylist…"
-                    style={{ flex: 1, padding: "13px 20px", border: `1px solid ${C.border}`, background: C.surface, fontSize: 13, fontWeight: 400, color: C.text, borderRadius: 26, transition: "border-color 0.25s" }} />
-                  <button onClick={sendMessage} disabled={!chatInput.trim() || chatLoading} className="fc-send"
-                    style={{ padding: "13px 22px", background: "#6D28D9", color: C.white, border: "none", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", cursor: chatInput.trim() ? "pointer" : "default", fontWeight: 600, opacity: chatInput.trim() ? 1 : 0.35, borderRadius: 26, transition: "opacity 0.25s" }}>
-                    Send
-                  </button>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input className="fc-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Reply to your stylist…"
+                      style={{ flex: 1, padding: "13px 20px", border: `1px solid ${C.border}`, background: C.surface, fontSize: 13, fontWeight: 400, color: C.text, borderRadius: 26, transition: "border-color 0.25s" }} />
+                    <button onClick={sendMessage} disabled={!chatInput.trim() || chatLoading} className="fc-send"
+                      style={{ padding: "13px 22px", background: "#6D28D9", color: C.white, border: "none", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", cursor: chatInput.trim() ? "pointer" : "default", fontWeight: 600, opacity: chatInput.trim() ? 1 : 0.35, borderRadius: 26, transition: "opacity 0.25s" }}>
+                      Send
+                    </button>
+                  </div>
                 </div>
               </div>
-
             </div>
-          </div>
           </div>
         )}
 
