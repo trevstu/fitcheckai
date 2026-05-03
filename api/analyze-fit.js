@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    const { base64Image, mimeType, frames, isVideo, category, stylePrompt, inspirationImage } = req.body
+    const { base64Image, mimeType, frames, isVideo, category, stylePrompt, inspirationImage, profile } = req.body
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
     const content = frames
@@ -24,6 +24,14 @@ export default async function handler(req, res) {
     const contextLines = []
     if (category) contextLines.push(`Style category: ${category}`)
     if (stylePrompt) contextLines.push(`What they're going for: "${stylePrompt}"`)
+    if (profile) {
+      if (profile.name) contextLines.push(`Name: ${profile.name}`)
+      if (profile.gender) contextLines.push(`Gender: ${profile.gender}`)
+      if (profile.fit_preference) contextLines.push(`Fit preference: ${profile.fit_preference}`)
+      if (profile.budget) contextLines.push(`Budget per item: ${profile.budget}`)
+      if (profile.favorite_brands) contextLines.push(`Favorite brands: ${profile.favorite_brands}`)
+      if (profile.climate) contextLines.push(`Climate: ${profile.climate}`)
+    }
     const contextStr = contextLines.length ? `\n\nUser context:\n${contextLines.join('\n')}` : ''
 
     content.push({

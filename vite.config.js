@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
           server.middlewares.use('/api/analyze-fit', async (req, res) => {
             if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({ error: 'Method not allowed' })); return }
             try {
-              const { base64Image, mimeType, frames, isVideo, category, stylePrompt, inspirationImage } = await readBody(req)
+              const { base64Image, mimeType, frames, isVideo, category, stylePrompt, inspirationImage, profile } = await readBody(req)
               const { default: Anthropic } = await import('@anthropic-ai/sdk')
               const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
 
@@ -42,6 +42,14 @@ export default defineConfig(({ mode }) => {
               const contextLines = []
               if (category) contextLines.push(`Style category: ${category}`)
               if (stylePrompt) contextLines.push(`What they're going for: "${stylePrompt}"`)
+              if (profile) {
+                if (profile.name) contextLines.push(`Name: ${profile.name}`)
+                if (profile.gender) contextLines.push(`Gender: ${profile.gender}`)
+                if (profile.fit_preference) contextLines.push(`Fit preference: ${profile.fit_preference}`)
+                if (profile.budget) contextLines.push(`Budget per item: ${profile.budget}`)
+                if (profile.favorite_brands) contextLines.push(`Favorite brands: ${profile.favorite_brands}`)
+                if (profile.climate) contextLines.push(`Climate: ${profile.climate}`)
+              }
               const contextStr = contextLines.length ? `\n\nUser context:\n${contextLines.join('\n')}` : ''
 
               content.push({
