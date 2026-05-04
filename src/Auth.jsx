@@ -38,6 +38,13 @@ export default function Auth() {
           </svg>
           {loading ? 'Redirecting…' : 'Continue with Google'}
         </button>
+
+        <div style={{ marginTop: 32, fontSize: 12, color: '#A1A1AA' }}>
+          By continuing, you agree to our{' '}
+          <a href="/terms.html" style={{ color: '#71717A', textDecoration: 'underline' }}>Terms of Service</a>
+          {' '}and{' '}
+          <a href="/privacy.html" style={{ color: '#71717A', textDecoration: 'underline' }}>Privacy Policy</a>
+        </div>
       </div>
     </div>
   )
