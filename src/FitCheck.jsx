@@ -199,7 +199,7 @@ export default function FitCheck({ user, onSignOut }) {
     mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     mr.onstop = () => { clearInterval(frameCaptureIntervalRef.current); stopStream(); setFrames(frameCaptureRef.current.length > 0 ? [...frameCaptureRef.current] : null); setStage("configure"); };
     mr.start(); recordingStartRef.current = Date.now();
-    captureFrameFromCamera(); frameCaptureIntervalRef.current = setInterval(captureFrameFromCamera, 3000);
+    frameCaptureIntervalRef.current = setInterval(captureFrameFromCamera, 3000);
     setRecording(true); setCountdown(15);
     countdownRef.current = setInterval(() => { setCountdown(prev => { if (prev <= 1) { stopRecording(); return 0; } return prev - 1; }); }, 1000);
   };
