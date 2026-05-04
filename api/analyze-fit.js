@@ -32,6 +32,8 @@ export default async function handler(req, res) {
       if (profile.favorite_brands) contextLines.push(`Favorite brands: ${profile.favorite_brands}`)
       if (profile.climate) contextLines.push(`Climate: ${profile.climate}`)
     }
+    const { closetItems } = req.body
+    if (closetItems && closetItems.length > 0) contextLines.push(`Items already in their closet: ${closetItems.join(', ')}`)
     const contextStr = contextLines.length ? `\n\nUser context:\n${contextLines.join('\n')}` : ''
 
     content.push({

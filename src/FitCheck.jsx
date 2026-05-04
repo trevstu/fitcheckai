@@ -40,6 +40,25 @@ function parseChatMessage(text) {
   return parts.length ? parts : [{ type: "text", content: text }];
 }
 
+const compressClosetImage = (file) => new Promise((resolve) => {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const MAX = 480;
+    let { width, height } = img;
+    if (width > MAX || height > MAX) {
+      if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+      else { width = Math.round(width * MAX / height); height = MAX; }
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+    URL.revokeObjectURL(url);
+    resolve(canvas.toDataURL("image/jpeg", 0.75));
+  };
+  img.src = url;
+});
+
 const compressImage = (file) => new Promise((resolve) => {
   const img = new Image();
   const url = URL.createObjectURL(file);
@@ -123,10 +142,13 @@ export default function FitCheck({ user, onSignOut }) {
   const [showProfile, setShowProfile] = useState(false);
   const [profileForm, setProfileForm] = useState(PROFILE_DEFAULTS);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [closet, setCloset] = useState([]);
+  const [closetTagging, setClosetTagging] = useState(false);
 
   const fileInputRef = useRef(null);
   const videoFileRef = useRef(null);
   const inspirationRef = useRef(null);
+  const closetInputRef = useRef(null);
   const chatEndRef = useRef(null);
   const liveVideoRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -139,7 +161,7 @@ export default function FitCheck({ user, onSignOut }) {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, chatLoading]);
   useEffect(() => { return () => stopStream(); }, []);
-  useEffect(() => { if (user) { loadProfile(); } }, [user]);
+  useEffect(() => { if (user) { loadProfile(); loadCloset(); } }, [user]);
 
   const stopStream = () => {
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
@@ -158,6 +180,30 @@ export default function FitCheck({ user, onSignOut }) {
   };
 
   const updateProfile = (key, val) => setProfileForm(p => ({ ...p, [key]: val }));
+
+  const loadCloset = async () => {
+    if (!user) return;
+    const { data } = await supabase.from("closet_items").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    setCloset(data || []);
+  };
+
+  const handleClosetFile = async (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    setClosetTagging(true);
+    try {
+      const base64 = await compressClosetImage(file);
+      const res = await fetch("/api/tag-item", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base64Image: base64, mimeType: "image/jpeg" }) });
+      const { label, item_type } = await res.json();
+      const { data } = await supabase.from("closet_items").insert({ user_id: user.id, image: base64, label: label || "Clothing item", item_type: item_type || "other" }).select().single();
+      if (data) setCloset(prev => [data, ...prev]);
+    } catch (err) { console.error("Failed to tag item:", err); }
+    finally { setClosetTagging(false); if (closetInputRef.current) closetInputRef.current.value = ""; }
+  };
+
+  const deleteClosetItem = async (id) => {
+    await supabase.from("closet_items").delete().eq("id", id);
+    setCloset(prev => prev.filter(item => item.id !== id));
+  };
 
   const loadHistory = useCallback(async () => {
     if (!user) return;
@@ -229,9 +275,10 @@ export default function FitCheck({ user, onSignOut }) {
     setStage("analyzing"); setError(null);
     try {
       const profile = Object.values(profileForm).some(v => v) ? profileForm : null;
+      const closetLabels = closet.map(i => i.label).filter(Boolean);
       const body = frames
-        ? { frames, category, stylePrompt, inspirationImage, isVideo: true, profile }
-        : { base64Image: image, mimeType: "image/jpeg", category, stylePrompt, inspirationImage, profile };
+        ? { frames, category, stylePrompt, inspirationImage, isVideo: true, profile, closetItems: closetLabels }
+        : { base64Image: image, mimeType: "image/jpeg", category, stylePrompt, inspirationImage, profile, closetItems: closetLabels };
       const res = await fetch("/api/analyze-fit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
       const data = await res.json();
@@ -399,13 +446,15 @@ export default function FitCheck({ user, onSignOut }) {
       <header className="fc-header-pad" style={{ padding: "20px 48px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: C.text }}>STYLD</div>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          {user && stage === "upload" && (
+          {user && stage === "upload" && (<>
             <button onClick={() => setShowProfile(true)} className="fc-back" style={headerBtn}>Profile</button>
-          )}
-          {user && stage === "upload" && (
+            <button onClick={() => setStage("closet")} className="fc-back" style={headerBtn}>Closet</button>
             <button onClick={() => { loadHistory(); setStage("history"); }} className="fc-back" style={headerBtn}>History</button>
+          </>)}
+          {stage === "closet" && (
+            <button onClick={() => setStage("upload")} className="fc-back" style={headerBtn}>← Back</button>
           )}
-          {stage !== "upload" && (
+          {stage !== "upload" && stage !== "closet" && (
             <button onClick={reset} className="fc-back" style={headerBtn}>New Look</button>
           )}
           {user && (
@@ -439,6 +488,7 @@ export default function FitCheck({ user, onSignOut }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <input type="file" ref={fileInputRef} onChange={handleFile} accept="image/*" style={{ display: "none" }} />
               <input type="file" ref={videoFileRef} onChange={handleVideoFile} accept="video/*" style={{ display: "none" }} />
+              <input type="file" ref={closetInputRef} onChange={handleClosetFile} accept="image/*" style={{ display: "none" }} />
               <button className="fc-btn-surface" onClick={() => fileInputRef.current?.click()}
                 style={{ padding: "18px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400, transition: "background 0.25s, border-color 0.25s" }}>
                 Upload Photo
@@ -559,6 +609,46 @@ export default function FitCheck({ user, onSignOut }) {
               style={{ width: "100%", padding: "16px", background: C.purple, color: C.white, border: "none", fontSize: 13, letterSpacing: "0.05em", fontWeight: 600, cursor: "pointer", transition: "opacity 0.25s", borderRadius: 14, fontFamily: "inherit" }}>
               Analyze My Fit
             </button>
+          </div>
+        )}
+
+        {/* ── CLOSET ── */}
+        {stage === "closet" && (
+          <div className="fc-fade" style={{ paddingTop: 48 }}>
+            <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>My Closet</div>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 28, lineHeight: 1.6 }}>Add photos of items you own — your stylist will reference them during analysis.</div>
+            <input type="file" ref={closetInputRef} onChange={handleClosetFile} accept="image/*" style={{ display: "none" }} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+              <div onClick={() => !closetTagging && closetInputRef.current?.click()}
+                style={{ aspectRatio: "1", border: `1px dashed ${C.border}`, borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: closetTagging ? "default" : "pointer", background: C.surface, gap: 8, transition: "border-color 0.2s" }}>
+                {closetTagging ? (
+                  <div style={{ width: 22, height: 22, border: `2px solid ${C.border}`, borderTopColor: C.purple, borderRadius: "50%", animation: "fc-spin 0.9s linear infinite" }} />
+                ) : (
+                  <>
+                    <div style={{ fontSize: 24, color: C.muted, lineHeight: 1 }}>+</div>
+                    <div style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: C.muted, fontWeight: 400 }}>Add Item</div>
+                  </>
+                )}
+              </div>
+              {closet.map(item => (
+                <div key={item.id} style={{ position: "relative" }}>
+                  <div style={{ aspectRatio: "1", overflow: "hidden", background: C.surface, borderRadius: 14, marginBottom: 6 }}>
+                    <img src={item.image} alt={item.label} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: C.text, fontWeight: 400, lineHeight: 1.4, paddingRight: 4 }}>{item.label}</div>
+                  <button onClick={() => deleteClosetItem(item.id)}
+                    style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.45)", border: "none", color: "#fff", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, fontFamily: "inherit" }}>
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            {closet.length === 0 && !closetTagging && (
+              <div style={{ paddingTop: 48, textAlign: "center" }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>No items yet</div>
+                <div style={{ fontSize: 13, color: C.muted }}>Tap + to add your first piece.</div>
+              </div>
+            )}
           </div>
         )}
 

@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
           server.middlewares.use('/api/analyze-fit', async (req, res) => {
             if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({ error: 'Method not allowed' })); return }
             try {
-              const { base64Image, mimeType, frames, isVideo, category, stylePrompt, inspirationImage, profile } = await readBody(req)
+              const { base64Image, mimeType, frames, isVideo, category, stylePrompt, inspirationImage, profile, closetItems } = await readBody(req)
               const { default: Anthropic } = await import('@anthropic-ai/sdk')
               const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
 
@@ -50,6 +50,7 @@ export default defineConfig(({ mode }) => {
                 if (profile.favorite_brands) contextLines.push(`Favorite brands: ${profile.favorite_brands}`)
                 if (profile.climate) contextLines.push(`Climate: ${profile.climate}`)
               }
+              if (closetItems && closetItems.length > 0) contextLines.push(`Items already in their closet: ${closetItems.join(', ')}`)
               const contextStr = contextLines.length ? `\n\nUser context:\n${contextLines.join('\n')}` : ''
 
               content.push({
@@ -92,6 +93,33 @@ Return ONLY a raw JSON object (no markdown, no extra text):
               res.end(JSON.stringify(JSON.parse(match[0])))
             } catch (err) {
               console.error('[analyze-fit]', err.message)
+              res.writeHead(500, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: err.message }))
+            }
+          })
+
+          // tag-item
+          server.middlewares.use('/api/tag-item', async (req, res) => {
+            if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({ error: 'Method not allowed' })); return }
+            try {
+              const { base64Image, mimeType } = await readBody(req)
+              const { default: Anthropic } = await import('@anthropic-ai/sdk')
+              const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
+              const message = await client.messages.create({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 128,
+                messages: [{ role: 'user', content: [
+                  { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image.replace(/^data:[^;]+;base64,/, '') } },
+                  { type: 'text', text: 'Identify this clothing item. Return ONLY a raw JSON object (no markdown): {"label": "<concise descriptive name e.g. Black slim Levi\'s 501 jeans>", "item_type": "<one of: tops, bottoms, shoes, outerwear, accessories, other>"}' }
+                ]}]
+              })
+              const text = message.content[0].text
+              const match = text.match(/\{[\s\S]*\}/)
+              if (!match) throw new Error('Could not parse response')
+              res.writeHead(200, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify(JSON.parse(match[0])))
+            } catch (err) {
+              console.error('[tag-item]', err.message)
               res.writeHead(500, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify({ error: err.message }))
             }
