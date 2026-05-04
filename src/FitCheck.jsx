@@ -144,6 +144,8 @@ export default function FitCheck({ user, onSignOut }) {
   const [profileSaving, setProfileSaving] = useState(false);
   const [closet, setCloset] = useState([]);
   const [closetTagging, setClosetTagging] = useState(false);
+  const [editingClosetId, setEditingClosetId] = useState(null);
+  const [editingClosetLabel, setEditingClosetLabel] = useState("");
 
   const fileInputRef = useRef(null);
   const videoFileRef = useRef(null);
@@ -203,6 +205,14 @@ export default function FitCheck({ user, onSignOut }) {
   const deleteClosetItem = async (id) => {
     await supabase.from("closet_items").delete().eq("id", id);
     setCloset(prev => prev.filter(item => item.id !== id));
+  };
+
+  const saveClosetLabel = async (id) => {
+    const label = editingClosetLabel.trim();
+    if (!label) return;
+    await supabase.from("closet_items").update({ label }).eq("id", id);
+    setCloset(prev => prev.map(item => item.id === id ? { ...item, label } : item));
+    setEditingClosetId(null);
   };
 
   const loadHistory = useCallback(async () => {
@@ -635,7 +645,19 @@ export default function FitCheck({ user, onSignOut }) {
                   <div style={{ aspectRatio: "1", overflow: "hidden", background: C.surface, borderRadius: 14, marginBottom: 6 }}>
                     <img src={item.image} alt={item.label} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   </div>
-                  <div style={{ fontSize: 11, color: C.text, fontWeight: 400, lineHeight: 1.4, paddingRight: 4 }}>{item.label}</div>
+                  {editingClosetId === item.id ? (
+                    <input
+                      autoFocus
+                      value={editingClosetLabel}
+                      onChange={e => setEditingClosetLabel(e.target.value)}
+                      onBlur={() => saveClosetLabel(item.id)}
+                      onKeyDown={e => { if (e.key === "Enter") saveClosetLabel(item.id); if (e.key === "Escape") setEditingClosetId(null); }}
+                      style={{ width: "100%", fontSize: 11, color: C.text, fontWeight: 400, lineHeight: 1.4, border: "none", borderBottom: `1px solid ${C.purple}`, background: "transparent", outline: "none", fontFamily: "inherit", padding: "2px 0", boxSizing: "border-box" }}
+                    />
+                  ) : (
+                    <div onClick={() => { setEditingClosetId(item.id); setEditingClosetLabel(item.label); }}
+                      style={{ fontSize: 11, color: C.text, fontWeight: 400, lineHeight: 1.4, paddingRight: 4, cursor: "text" }}>{item.label}</div>
+                  )}
                   <button onClick={() => deleteClosetItem(item.id)}
                     style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.45)", border: "none", color: "#fff", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, fontFamily: "inherit" }}>
                     ×
