@@ -98,6 +98,41 @@ Return ONLY a raw JSON object (no markdown, no extra text):
             }
           })
 
+          // plan-outfit
+          server.middlewares.use('/api/plan-outfit', async (req, res) => {
+            if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({ error: 'Method not allowed' })); return }
+            try {
+              const { eventPrompt, profile, closetItems } = await readBody(req)
+              const { default: Anthropic } = await import('@anthropic-ai/sdk')
+              const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
+              const contextLines = []
+              if (profile) {
+                if (profile.name) contextLines.push(`Name: ${profile.name}`)
+                if (profile.gender) contextLines.push(`Gender: ${profile.gender}`)
+                if (profile.fit_preference) contextLines.push(`Fit preference: ${profile.fit_preference}`)
+                if (profile.budget) contextLines.push(`Budget per item: ${profile.budget}`)
+                if (profile.favorite_brands) contextLines.push(`Favorite brands: ${profile.favorite_brands}`)
+                if (profile.climate) contextLines.push(`Climate: ${profile.climate}`)
+              }
+              if (closetItems && closetItems.length > 0) contextLines.push(`Items in their closet: ${closetItems.join(', ')}`)
+              const contextStr = contextLines.length ? `\n\nUser context:\n${contextLines.join('\n')}` : ''
+              const message = await client.messages.create({
+                model: 'claude-opus-4-6',
+                max_tokens: 1024,
+                messages: [{ role: 'user', content: `You are a personal stylist — direct, warm, and sharp. Your client needs help planning an outfit.\n\nEvent: "${eventPrompt}"${contextStr}\n\nBuild them a complete outfit for this event. Keep all text SHORT and punchy — like texting a stylish friend.\n\nIf they have closet items, reference those first using action "wear". For pieces they need to buy or add, use action "add". Aim for 3-5 moves total.\n\nReturn ONLY a raw JSON object (no markdown, no extra text):\n{\n  "vibe": "<2-3 word vibe label>",\n  "breakdown": { "fit": "<silhouette>", "color": "<palette>", "styling": "<key note>", "vibe": "<energy>" },\n  "moves": [\n    {"action": "wear", "item": "<closet item>", "reason": "<why>"},\n    {"action": "add", "item": "<new piece>", "reason": "<why>"}\n  ],\n  "highlight": "<key piece or decision, one sentence>",\n  "question": "<one casual follow-up question>"\n}` }]
+              })
+              const text = message.content[0].text
+              const match = text.match(/\{[\s\S]*\}/)
+              if (!match) throw new Error('Could not parse response')
+              res.writeHead(200, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify(JSON.parse(match[0])))
+            } catch (err) {
+              console.error('[plan-outfit]', err.message)
+              res.writeHead(500, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: err.message }))
+            }
+          })
+
           // tag-item
           server.middlewares.use('/api/tag-item', async (req, res) => {
             if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({ error: 'Method not allowed' })); return }

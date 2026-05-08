@@ -23,6 +23,7 @@ const ACTION_STYLE = {
   add:    { label: "ADD",    color: "#16A34A", bg: "#F0FDF4" },
   swap:   { label: "SWAP",   color: "#D97706", bg: "#FFFBEB" },
   remove: { label: "REMOVE", color: "#DC2626", bg: "#FFF1F2" },
+  wear:   { label: "WEAR",   color: "#7C3AED", bg: "#F3F0FF" },
 };
 
 const PROFILE_DEFAULTS = { name: "", gender: "", fit_preference: "", budget: "", favorite_brands: "", climate: "" };
@@ -146,6 +147,8 @@ export default function FitCheck({ user, onSignOut }) {
   const [closetTagging, setClosetTagging] = useState(false);
   const [editingClosetId, setEditingClosetId] = useState(null);
   const [editingClosetLabel, setEditingClosetLabel] = useState("");
+  const [eventPrompt, setEventPrompt] = useState("");
+  const [isPlan, setIsPlan] = useState(false);
 
   const fileInputRef = useRef(null);
   const videoFileRef = useRef(null);
@@ -299,6 +302,23 @@ export default function FitCheck({ user, onSignOut }) {
     } catch (err) { setError(err.message); setStage("configure"); }
   };
 
+  const planOutfit = async () => {
+    if (!eventPrompt.trim()) return;
+    setStage("analyzing"); setError(null); setIsPlan(true);
+    try {
+      const profile = Object.values(profileForm).some(v => v) ? profileForm : null;
+      const closetLabels = closet.map(i => i.label).filter(Boolean);
+      const res = await fetch("/api/plan-outfit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventPrompt: eventPrompt.trim(), profile, closetItems: closetLabels }) });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+      const data = await res.json();
+      setAnalysis(data); setStylePrompt(eventPrompt.trim()); setCategory(null);
+      setMessages([{ role: "assistant", content: data.question }]); setStage("results");
+      if (user) {
+        supabase.from("fit_history").insert({ user_id: user.id, image: null, frames: null, category: "Outfit Plan", style_prompt: eventPrompt.trim(), analysis: data }).then(() => {});
+      }
+    } catch (err) { setError(err.message); setStage("upload"); setIsPlan(false); }
+  };
+
   const sendMessage = async () => {
     if (!chatInput.trim() || chatLoading) return;
     const userMsg = { role: "user", content: chatInput.trim() };
@@ -355,7 +375,7 @@ export default function FitCheck({ user, onSignOut }) {
     setStage("upload"); setImage(null); setFrames(null); setInspirationImage(null);
     setCategory(null); setStylePrompt(""); setAnalysis(null);
     setError(null); setMessages([]); setChatInput(""); setShowInspiration(false);
-    setRecording(false); setCountdown(15); setCameraError(null);
+    setRecording(false); setCountdown(15); setCameraError(null); setIsPlan(false); setEventPrompt("");
     [fileInputRef, videoFileRef, inspirationRef].forEach(r => { if (r.current) r.current.value = ""; });
   };
 
@@ -381,6 +401,8 @@ export default function FitCheck({ user, onSignOut }) {
         .fc-history-item:hover { opacity: 0.82; transform: translateY(-2px); }
         .fc-categories { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
         .fc-categories::-webkit-scrollbar { display:none; }
+        .fc-plan-input:focus { outline:none; border-color:${C.purple} !important; }
+        .fc-plan-input::placeholder { color:${C.muted}; }
         .fc-chat-input:focus { outline:none; border-color:${C.purple} !important; }
         .fc-chat-input::placeholder { color:${C.muted}; }
         .fc-textarea:focus { outline:none; border-color:${C.purple} !important; }
@@ -506,6 +528,22 @@ export default function FitCheck({ user, onSignOut }) {
               <button className="fc-btn-surface" onClick={() => videoFileRef.current?.click()}
                 style={{ padding: "18px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400, transition: "background 0.25s, border-color 0.25s" }}>
                 Upload Video
+              </button>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 20, marginBottom: 12 }}>
+              <div style={{ flex: 1, height: 1, background: C.border }} />
+              <div style={{ fontSize: 11, color: C.muted, fontWeight: 400, letterSpacing: "0.1em" }}>or plan an outfit</div>
+              <div style={{ flex: 1, height: 1, background: C.border }} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input className="fc-plan-input" value={eventPrompt} onChange={e => setEventPrompt(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && planOutfit()}
+                placeholder="What's the occasion? e.g. day party in Brooklyn…"
+                style={{ flex: 1, padding: "14px 18px", border: `1px solid ${C.border}`, background: C.surface, fontSize: 13, color: C.text, borderRadius: 14, transition: "border-color 0.25s", fontFamily: "inherit" }} />
+              <button onClick={planOutfit} disabled={!eventPrompt.trim()} className="fc-btn-primary"
+                style={{ padding: "14px 18px", background: C.purple, color: C.white, border: "none", borderRadius: 14, fontSize: 18, cursor: eventPrompt.trim() ? "pointer" : "default", opacity: eventPrompt.trim() ? 1 : 0.35, transition: "opacity 0.25s", fontFamily: "inherit" }}>
+                →
               </button>
             </div>
           </div>
@@ -678,7 +716,7 @@ export default function FitCheck({ user, onSignOut }) {
         {stage === "analyzing" && (
           <div className="fc-fade" style={{ paddingTop: 80, display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
             <div style={{ width: 28, height: 28, border: `2px solid ${C.border}`, borderTopColor: C.purple, borderRadius: "50%", animation: "fc-spin 0.9s linear infinite" }} />
-            <div style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 400 }}>{frames ? "Reading your video…" : "Reading your fit…"}</div>
+            <div style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 400 }}>{isPlan ? "Building your outfit…" : frames ? "Reading your video…" : "Reading your fit…"}</div>
           </div>
         )}
 
@@ -732,34 +770,57 @@ export default function FitCheck({ user, onSignOut }) {
             <div className="fc-results-grid">
               {/* Left */}
               <div className="fc-image-sticky">
-                <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>{frames ? "Submitted Video" : "Submitted Look"}</div>
-                {frames ? (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                    {frames.slice(0, 4).map((f, i) => (
-                      <div key={i} style={{ aspectRatio: "9/16", overflow: "hidden", background: C.surface, borderRadius: 12 }}>
-                        <img src={f} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
-                    <img src={image} alt="Your fit" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  </div>
-                )}
-                {inspirationImage && (
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>Inspiration</div>
-                    <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
-                      <img src={inspirationImage} alt="Inspiration" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                {isPlan ? (
+                  <>
+                    <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>The Occasion</div>
+                    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 20px" }}>
+                      <div style={{ fontSize: 15, color: C.text, fontWeight: 400, lineHeight: 1.6, fontStyle: "italic" }}>"{stylePrompt}"</div>
                     </div>
-                  </div>
+                    {closet.length > 0 && (
+                      <div style={{ marginTop: 20 }}>
+                        <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 10 }}>Your Closet</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                          {closet.slice(0, 6).map(item => (
+                            <div key={item.id} style={{ aspectRatio: "1", overflow: "hidden", background: C.surface, borderRadius: 10 }}>
+                              <img src={item.image} alt={item.label} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>{frames ? "Submitted Video" : "Submitted Look"}</div>
+                    {frames ? (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                        {frames.slice(0, 4).map((f, i) => (
+                          <div key={i} style={{ aspectRatio: "9/16", overflow: "hidden", background: C.surface, borderRadius: 12 }}>
+                            <img src={f} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
+                        <img src={image} alt="Your fit" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      </div>
+                    )}
+                    {inspirationImage && (
+                      <div style={{ marginTop: 14 }}>
+                        <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>Inspiration</div>
+                        <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
+                          <img src={inspirationImage} alt="Inspiration" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               {/* Right */}
               <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
                 <div style={{ borderLeft: `3px solid ${C.purple}`, paddingLeft: 18 }}>
-                  <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.purple, fontWeight: 600, marginBottom: 7 }}>What's Working</div>
+                  <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.purple, fontWeight: 600, marginBottom: 7 }}>{isPlan ? "Key Piece" : "What's Working"}</div>
                   <div style={{ fontSize: 14, color: C.text, fontWeight: 400, lineHeight: 1.6 }}>{analysis.highlight}</div>
                 </div>
 
