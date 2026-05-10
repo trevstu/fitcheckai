@@ -756,29 +756,18 @@ export default function FitCheck({ user, onSignOut }) {
         {/* ── RESULTS ── */}
         {stage === "results" && analysis && (
           <div className="fc-fade">
-            <div style={{ paddingTop: 48, paddingBottom: 32, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>The Vibe</div>
-                <div style={{ fontSize: 58, fontWeight: 400, fontStyle: "italic", fontFamily: "'EB Garamond','Garamond','Times New Roman',serif", letterSpacing: "0.01em", lineHeight: 1.1, color: C.text }}>{analysis.vibe}</div>
-              </div>
-              <button onClick={shareCard} className="fc-share"
-                style={{ flexShrink: 0, padding: "10px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 11, fontWeight: 500, color: C.text, cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", transition: "background 0.2s", fontFamily: "inherit", marginBottom: 6 }}>
-                Share
-              </button>
-            </div>
-
-            <div className="fc-results-grid">
-              {/* Left */}
+            <div className="fc-results-grid" style={{ paddingTop: 40 }}>
+              {/* Left — annotated photo card + breakdown tiles */}
               <div className="fc-image-sticky">
                 {isPlan ? (
                   <>
-                    <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>The Occasion</div>
-                    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 20px" }}>
-                      <div style={{ fontSize: 15, color: C.text, fontWeight: 400, lineHeight: 1.6, fontStyle: "italic" }}>"{stylePrompt}"</div>
+                    <div style={{ position: "relative", background: "#0A0A0A", borderRadius: 20, padding: "28px 22px", minHeight: 180, overflow: "hidden" }}>
+                      <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", fontWeight: 500, marginBottom: 14 }}>The Occasion</div>
+                      <div style={{ fontFamily: "'Caveat', cursive", fontSize: 26, fontWeight: 600, color: C.white, lineHeight: 1.3 }}>"{stylePrompt}"</div>
                     </div>
                     {closet.length > 0 && (
-                      <div style={{ marginTop: 20 }}>
-                        <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 10 }}>Your Closet</div>
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>Your Closet</div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                           {closet.slice(0, 6).map(item => (
                             <div key={item.id} style={{ aspectRatio: "1", overflow: "hidden", background: C.surface, borderRadius: 10 }}>
@@ -790,38 +779,64 @@ export default function FitCheck({ user, onSignOut }) {
                     )}
                   </>
                 ) : (
-                  <>
-                    <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>{frames ? "Submitted Video" : "Submitted Look"}</div>
-                    {frames ? (
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                        {frames.slice(0, 4).map((f, i) => (
-                          <div key={i} style={{ aspectRatio: "9/16", overflow: "hidden", background: C.surface, borderRadius: 12 }}>
-                            <img src={f} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <div style={{ position: "relative", aspectRatio: "3/4", overflow: "hidden", borderRadius: 20, background: C.surface }}>
+                    <img
+                      src={frames?.[0] || image}
+                      alt="Your fit"
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 38%, rgba(0,0,0,0.85) 100%)" }} />
+                    <div style={{ position: "absolute", bottom: 52, left: 18, right: 18 }}>
+                      <div style={{ fontFamily: "'Caveat', cursive", fontSize: 36, fontWeight: 700, color: C.white, lineHeight: 1.15, textShadow: "0 2px 12px rgba(0,0,0,0.4)" }}>{analysis.vibe}</div>
+                    </div>
+                    <button onClick={shareCard} className="fc-share"
+                      style={{ position: "absolute", bottom: 14, right: 14, padding: "7px 14px", background: "rgba(255,255,255,0.15)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10, fontSize: 10, fontWeight: 600, color: C.white, cursor: "pointer", letterSpacing: "0.12em", textTransform: "uppercase", transition: "background 0.2s", fontFamily: "inherit" }}>
+                      Share
+                    </button>
+                    {frames && (
+                      <div style={{ position: "absolute", bottom: 14, left: 14, display: "flex", gap: 4 }}>
+                        {frames.slice(1, 4).map((f, i) => (
+                          <div key={i} style={{ width: 32, aspectRatio: "9/16", overflow: "hidden", borderRadius: 6, border: "1px solid rgba(255,255,255,0.3)" }}>
+                            <img src={f} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
-                        <img src={image} alt="Your fit" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      </div>
                     )}
-                    {inspirationImage && (
-                      <div style={{ marginTop: 14 }}>
-                        <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>Inspiration</div>
-                        <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
-                          <img src={inspirationImage} alt="Inspiration" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                        </div>
+                  </div>
+                )}
+
+                {/* Breakdown tiles */}
+                {analysis.breakdown && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
+                    {[
+                      { key: "fit", label: "FIT" },
+                      { key: "color", label: "COLOR" },
+                      { key: "styling", label: "STYLING" },
+                      { key: "vibe", label: "VIBE" },
+                    ].map(({ key, label }) => analysis.breakdown[key] && (
+                      <div key={key} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px" }}>
+                        <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 600, marginBottom: 5 }}>{label}</div>
+                        <div style={{ fontFamily: "'Caveat', cursive", fontSize: 16, color: C.text, lineHeight: 1.3 }}>{analysis.breakdown[key]}</div>
                       </div>
-                    )}
-                  </>
+                    ))}
+                  </div>
+                )}
+
+                {inspirationImage && !isPlan && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>Inspiration</div>
+                    <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
+                      <img src={inspirationImage} alt="Inspiration" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    </div>
+                  </div>
                 )}
               </div>
 
               {/* Right */}
               <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-                <div style={{ borderLeft: `3px solid ${C.purple}`, paddingLeft: 18 }}>
-                  <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.purple, fontWeight: 600, marginBottom: 7 }}>{isPlan ? "Key Piece" : "What's Working"}</div>
-                  <div style={{ fontSize: 14, color: C.text, fontWeight: 400, lineHeight: 1.6 }}>{analysis.highlight}</div>
+                <div>
+                  <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.purple, fontWeight: 700, marginBottom: 8 }}>✦ {isPlan ? "Key Piece" : "What's Working"}</div>
+                  <div style={{ fontSize: 15, color: C.text, fontWeight: 400, lineHeight: 1.65 }}>{analysis.highlight}</div>
                 </div>
 
                 <div>
@@ -830,11 +845,11 @@ export default function FitCheck({ user, onSignOut }) {
                     {(analysis.moves || []).map((move, i) => {
                       const s = ACTION_STYLE[move.action] || ACTION_STYLE.swap;
                       return (
-                        <div key={i} style={{ padding: "16px 18px", background: s.bg, display: "flex", gap: 14, alignItems: "flex-start", borderRadius: 14, border: "1px solid rgba(0,0,0,0.04)" }}>
-                          <span style={{ fontSize: 9, letterSpacing: "0.2em", color: s.color, fontWeight: 700, textTransform: "uppercase", paddingTop: 3, flexShrink: 0 }}>{s.label}</span>
+                        <div key={i} style={{ padding: "18px 20px", background: s.bg, display: "flex", gap: 14, alignItems: "flex-start", borderRadius: 16, border: "1px solid rgba(0,0,0,0.04)" }}>
+                          <span style={{ fontSize: 10, letterSpacing: "0.15em", color: s.color, fontWeight: 800, textTransform: "uppercase", background: `${s.color}18`, padding: "5px 10px", borderRadius: 8, flexShrink: 0, marginTop: 1 }}>{s.label}</span>
                           <div>
-                            <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 3 }}>{move.item}</div>
-                            <div style={{ fontSize: 12, color: C.muted, fontWeight: 400, lineHeight: 1.5 }}>{move.reason}</div>
+                            <div style={{ fontSize: 15, color: C.text, fontWeight: 700, marginBottom: 4 }}>{move.item}</div>
+                            <div style={{ fontSize: 12, color: C.muted, fontWeight: 400, lineHeight: 1.5, fontStyle: "italic" }}>{move.reason}</div>
                           </div>
                         </div>
                       );
