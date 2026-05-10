@@ -54,9 +54,9 @@ Return ONLY a raw JSON object (no markdown, no extra text):
     "vibe": "<one punchy sentence>"
   },
   "moves": [
-    {"action": "add", "item": "<specific item>", "reason": "<one short sentence>"},
-    {"action": "swap", "item": "<what to swap and for what>", "reason": "<one short sentence>"},
-    {"action": "remove", "item": "<specific item>", "reason": "<one short sentence>"}
+    {"action": "add", "item": "<specific item>", "reason": "<one short sentence>", "imageQuery": "<3-5 word shopping image search for this item>"},
+    {"action": "swap", "item": "<what to swap and for what>", "reason": "<one short sentence>", "imageQuery": "<3-5 word shopping image search for the replacement item>"},
+    {"action": "remove", "item": "<specific item>", "reason": "<one short sentence>", "imageQuery": "<3-5 word shopping image search for this item>"}
   ],
   "highlight": "<what is genuinely working, one sentence>",
   "question": "<one conversational follow-up question a stylist would ask, keep it casual>"

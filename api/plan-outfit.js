@@ -42,8 +42,8 @@ Return ONLY a raw JSON object (no markdown, no extra text):
     "vibe": "<the energy>"
   },
   "moves": [
-    {"action": "wear", "item": "<specific item from their closet>", "reason": "<why it works>"},
-    {"action": "add", "item": "<specific piece to get>", "reason": "<why it works>"}
+    {"action": "wear", "item": "<specific item from their closet>", "reason": "<why it works>", "imageQuery": "<3-5 word image search to style this item>"},
+    {"action": "add", "item": "<specific piece to get>", "reason": "<why it works>", "imageQuery": "<3-5 word shopping image search for this item>"}
   ],
   "highlight": "<the most important piece or styling decision for this look, one sentence>",
   "question": "<one casual follow-up question about the event or their style>"

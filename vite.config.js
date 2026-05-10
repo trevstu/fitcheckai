@@ -71,9 +71,9 @@ Return ONLY a raw JSON object (no markdown, no extra text):
     "vibe": "<one punchy sentence>"
   },
   "moves": [
-    {"action": "add", "item": "<specific item>", "reason": "<one short sentence>"},
-    {"action": "swap", "item": "<what to swap and for what>", "reason": "<one short sentence>"},
-    {"action": "remove", "item": "<specific item>", "reason": "<one short sentence>"}
+    {"action": "add", "item": "<specific item>", "reason": "<one short sentence>", "imageQuery": "<3-5 word shopping image search>"},
+    {"action": "swap", "item": "<what to swap and for what>", "reason": "<one short sentence>", "imageQuery": "<3-5 word shopping image search for replacement>"},
+    {"action": "remove", "item": "<specific item>", "reason": "<one short sentence>", "imageQuery": "<3-5 word shopping image search>"}
   ],
   "highlight": "<what is genuinely working, one sentence>",
   "question": "<one conversational follow-up question a stylist would ask, keep it casual>"
@@ -119,7 +119,7 @@ Return ONLY a raw JSON object (no markdown, no extra text):
               const message = await client.messages.create({
                 model: 'claude-opus-4-6',
                 max_tokens: 1024,
-                messages: [{ role: 'user', content: `You are a personal stylist — direct, warm, and sharp. Your client needs help planning an outfit.\n\nEvent: "${eventPrompt}"${contextStr}\n\nBuild them a complete outfit for this event. Keep all text SHORT and punchy — like texting a stylish friend.\n\nIf they have closet items, reference those first using action "wear". For pieces they need to buy or add, use action "add". Aim for 3-5 moves total.\n\nReturn ONLY a raw JSON object (no markdown, no extra text):\n{\n  "vibe": "<2-3 word vibe label>",\n  "breakdown": { "fit": "<silhouette>", "color": "<palette>", "styling": "<key note>", "vibe": "<energy>" },\n  "moves": [\n    {"action": "wear", "item": "<closet item>", "reason": "<why>"},\n    {"action": "add", "item": "<new piece>", "reason": "<why>"}\n  ],\n  "highlight": "<key piece or decision, one sentence>",\n  "question": "<one casual follow-up question>"\n}` }]
+                messages: [{ role: 'user', content: `You are a personal stylist — direct, warm, and sharp. Your client needs help planning an outfit.\n\nEvent: "${eventPrompt}"${contextStr}\n\nBuild them a complete outfit for this event. Keep all text SHORT and punchy — like texting a stylish friend.\n\nIf they have closet items, reference those first using action "wear". For pieces they need to buy or add, use action "add". Aim for 3-5 moves total.\n\nReturn ONLY a raw JSON object (no markdown, no extra text):\n{\n  "vibe": "<2-3 word vibe label>",\n  "breakdown": { "fit": "<silhouette>", "color": "<palette>", "styling": "<key note>", "vibe": "<energy>" },\n  "moves": [\n    {"action": "wear", "item": "<closet item>", "reason": "<why>", "imageQuery": "<3-5 word image search>"},\n    {"action": "add", "item": "<new piece>", "reason": "<why>", "imageQuery": "<3-5 word shopping image search>"}\n  ],\n  "highlight": "<key piece or decision, one sentence>",\n  "question": "<one casual follow-up question>"\n}` }]
               })
               const text = message.content[0].text
               const match = text.match(/\{[\s\S]*\}/)

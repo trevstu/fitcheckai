@@ -109,6 +109,52 @@ const extractFrames = (blob, knownDuration) => new Promise((resolve) => {
   video.load();
 });
 
+function MoveCard({ move }) {
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const s = ACTION_STYLE[move.action] || ACTION_STYLE.swap;
+  const shopUrl = `https://www.google.com/search?q=${encodeURIComponent(move.item)}&tbm=shop`;
+
+  useEffect(() => {
+    const key = import.meta.env.VITE_GOOGLE_CSE_KEY;
+    const cx = import.meta.env.VITE_GOOGLE_CSE_ID;
+    if (!key || !cx || !move.imageQuery) { setLoading(false); return; }
+    fetch(`https://www.googleapis.com/customsearch/v1?key=${key}&cx=${cx}&q=${encodeURIComponent(move.imageQuery)}&searchType=image&num=5&safe=active`)
+      .then(r => r.json())
+      .then(data => { setImages((data.items || []).map(i => ({ url: i.link, page: i.image?.contextLink }))); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [move.imageQuery]);
+
+  return (
+    <div style={{ background: s.bg, borderRadius: 16, border: "1px solid rgba(0,0,0,0.04)", overflow: "hidden" }}>
+      <div style={{ padding: "16px 18px 10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
+          <span style={{ fontSize: 10, letterSpacing: "0.15em", color: s.color, fontWeight: 800, textTransform: "uppercase", background: `${s.color}18`, padding: "4px 10px", borderRadius: 7, flexShrink: 0 }}>{s.label}</span>
+          <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{move.item}</div>
+        </div>
+        <div style={{ fontSize: 12, color: C.muted, fontStyle: "italic", lineHeight: 1.5 }}>{move.reason}</div>
+      </div>
+      <div className="fc-img-scroll" style={{ display: "flex", gap: 8, overflowX: "auto", padding: "8px 18px 16px", WebkitOverflowScrolling: "touch" }}>
+        {loading ? (
+          [0,1,2,3].map(i => <div key={i} style={{ flexShrink: 0, width: 88, height: 88, borderRadius: 12, background: `${s.color}12`, animation: "fc-pulse 1.5s ease infinite" }} />)
+        ) : images.map((img, i) => (
+          <a key={i} href={img.page || shopUrl} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, display: "block", textDecoration: "none" }}>
+            <div style={{ width: 88, height: 88, borderRadius: 12, overflow: "hidden", background: C.surfaceHigh }}>
+              <img src={img.url} alt={move.item} style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                onError={e => { e.target.closest('a').style.display = 'none'; }} />
+            </div>
+          </a>
+        ))}
+        <a href={shopUrl} target="_blank" rel="noopener noreferrer"
+          style={{ flexShrink: 0, width: 88, height: 88, borderRadius: 12, background: `${s.color}12`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textDecoration: "none", gap: 4, border: `1px dashed ${s.color}40` }}>
+          <div style={{ fontSize: 20 }}>🛍</div>
+          <div style={{ fontSize: 9, color: s.color, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Shop All</div>
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function PillGroup({ options, value, onChange }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -403,6 +449,8 @@ export default function FitCheck({ user, onSignOut }) {
         .fc-categories::-webkit-scrollbar { display:none; }
         .fc-plan-input:focus { outline:none; border-color:${C.purple} !important; }
         .fc-plan-input::placeholder { color:${C.muted}; }
+        .fc-img-scroll::-webkit-scrollbar { display:none; }
+        .fc-img-scroll { scrollbar-width:none; }
         .fc-chat-input:focus { outline:none; border-color:${C.purple} !important; }
         .fc-chat-input::placeholder { color:${C.muted}; }
         .fc-textarea:focus { outline:none; border-color:${C.purple} !important; }
@@ -763,7 +811,7 @@ export default function FitCheck({ user, onSignOut }) {
                   <>
                     <div style={{ position: "relative", background: "#0A0A0A", borderRadius: 20, padding: "28px 22px", minHeight: 180, overflow: "hidden" }}>
                       <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", fontWeight: 500, marginBottom: 14 }}>The Occasion</div>
-                      <div style={{ fontFamily: "'Caveat', cursive", fontSize: 26, fontWeight: 600, color: C.white, lineHeight: 1.3 }}>"{stylePrompt}"</div>
+                      <div style={{ fontFamily: "'EB Garamond','Garamond',serif", fontSize: 22, fontWeight: 400, fontStyle: "italic", color: C.white, lineHeight: 1.4 }}>"{stylePrompt}"</div>
                     </div>
                     {closet.length > 0 && (
                       <div style={{ marginTop: 12 }}>
@@ -787,7 +835,7 @@ export default function FitCheck({ user, onSignOut }) {
                     />
                     <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 38%, rgba(0,0,0,0.85) 100%)" }} />
                     <div style={{ position: "absolute", bottom: 52, left: 18, right: 18 }}>
-                      <div style={{ fontFamily: "'Caveat', cursive", fontSize: 36, fontWeight: 700, color: C.white, lineHeight: 1.15, textShadow: "0 2px 12px rgba(0,0,0,0.4)" }}>{analysis.vibe}</div>
+                      <div style={{ fontFamily: "'EB Garamond','Garamond','Times New Roman',serif", fontSize: 42, fontWeight: 400, fontStyle: "italic", color: C.white, lineHeight: 1.1, textShadow: "0 2px 16px rgba(0,0,0,0.5)" }}>{analysis.vibe}</div>
                     </div>
                     <button onClick={shareCard} className="fc-share"
                       style={{ position: "absolute", bottom: 14, right: 14, padding: "7px 14px", background: "rgba(255,255,255,0.15)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10, fontSize: 10, fontWeight: 600, color: C.white, cursor: "pointer", letterSpacing: "0.12em", textTransform: "uppercase", transition: "background 0.2s", fontFamily: "inherit" }}>
@@ -802,23 +850,6 @@ export default function FitCheck({ user, onSignOut }) {
                         ))}
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* Breakdown tiles */}
-                {analysis.breakdown && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
-                    {[
-                      { key: "fit", label: "FIT" },
-                      { key: "color", label: "COLOR" },
-                      { key: "styling", label: "STYLING" },
-                      { key: "vibe", label: "VIBE" },
-                    ].map(({ key, label }) => analysis.breakdown[key] && (
-                      <div key={key} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px" }}>
-                        <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 600, marginBottom: 5 }}>{label}</div>
-                        <div style={{ fontFamily: "'Caveat', cursive", fontSize: 16, color: C.text, lineHeight: 1.3 }}>{analysis.breakdown[key]}</div>
-                      </div>
-                    ))}
                   </div>
                 )}
 
@@ -842,18 +873,7 @@ export default function FitCheck({ user, onSignOut }) {
                 <div>
                   <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 14 }}>The Moves</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {(analysis.moves || []).map((move, i) => {
-                      const s = ACTION_STYLE[move.action] || ACTION_STYLE.swap;
-                      return (
-                        <div key={i} style={{ padding: "18px 20px", background: s.bg, display: "flex", gap: 14, alignItems: "flex-start", borderRadius: 16, border: "1px solid rgba(0,0,0,0.04)" }}>
-                          <span style={{ fontSize: 10, letterSpacing: "0.15em", color: s.color, fontWeight: 800, textTransform: "uppercase", background: `${s.color}18`, padding: "5px 10px", borderRadius: 8, flexShrink: 0, marginTop: 1 }}>{s.label}</span>
-                          <div>
-                            <div style={{ fontSize: 15, color: C.text, fontWeight: 700, marginBottom: 4 }}>{move.item}</div>
-                            <div style={{ fontSize: 12, color: C.muted, fontWeight: 400, lineHeight: 1.5, fontStyle: "italic" }}>{move.reason}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {(analysis.moves || []).map((move, i) => <MoveCard key={i} move={move} />)}
                   </div>
                 </div>
 
