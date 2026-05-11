@@ -121,7 +121,7 @@ function MoveCard({ move }) {
     if (!key || !cx || !move.imageQuery) { setLoading(false); return; }
     fetch(`https://www.googleapis.com/customsearch/v1?key=${key}&cx=${cx}&q=${encodeURIComponent(move.imageQuery)}&searchType=image&num=5&safe=active`)
       .then(r => r.json())
-      .then(data => { setImages((data.items || []).map(i => ({ url: i.link, page: i.image?.contextLink }))); setLoading(false); })
+      .then(data => { setImages((data.items || []).map(i => ({ url: i.image?.thumbnailLink || i.link, page: i.image?.contextLink }))); setLoading(false); })
       .catch(() => setLoading(false));
   }, [move.imageQuery]);
 
