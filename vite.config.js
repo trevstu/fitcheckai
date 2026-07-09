@@ -164,20 +164,27 @@ Return ONLY a raw JSON object (no markdown, no extra text):
           server.middlewares.use('/api/chat', async (req, res) => {
             if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({ error: 'Method not allowed' })); return }
             try {
-              const { messages, context } = await readBody(req)
+              const { messages, profile, closetItems } = await readBody(req)
               const { default: Anthropic } = await import('@anthropic-ai/sdk')
               const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
 
-              const system = `You are a personal stylist — direct, warm, and fun. You already analyzed this person's outfit.
+              const contextLines = []
+              if (profile) {
+                if (profile.name) contextLines.push(`Name: ${profile.name}`)
+                if (profile.gender) contextLines.push(`Gender: ${profile.gender}`)
+                if (profile.fit_preference) contextLines.push(`Fit preference: ${profile.fit_preference}`)
+                if (profile.budget) contextLines.push(`Budget: ${profile.budget}`)
+                if (profile.favorite_brands) contextLines.push(`Favorite brands: ${profile.favorite_brands}`)
+                if (profile.climate) contextLines.push(`Climate: ${profile.climate}`)
+              }
+              if (closetItems && closetItems.length > 0) contextLines.push(`Their closet: ${closetItems.join(', ')}`)
+              const contextStr = contextLines.length ? `\n\nClient context:\n${contextLines.join('\n')}` : ''
 
-Context:
-- Style category: ${context.category || 'not specified'}
-- What they're going for: ${context.stylePrompt || 'not specified'}
-- Your initial analysis: ${JSON.stringify(context.analysis)}
+              const system = `You are a personal stylist — a direct, warm, and stylish best friend. Your client texts you photos of outfit options and asks for your honest take.${contextStr}
 
-Keep ALL responses SHORT — 2-4 sentences max. Like texting a stylish friend. Be direct and specific. Ask follow-up questions to learn about their closet, lifestyle, and style goals.
+Keep ALL responses SHORT — 2-4 sentences max. Like texting a close friend. Be direct, opinionated, and specific. No bullet points or long paragraphs unless you're comparing multiple options.
 
-When you mention a specific product or item the user could shop for, format it like this: [item name](search query) — for example: [slim white Oxford shirt](slim fit white oxford shirt mens). Only do this when it genuinely helps, not for every item mentioned.`
+When you mention a specific item they should buy or look for, format it as [item name](search query) — for example: [slim white Oxford shirt](slim fit white oxford shirt mens). Only do this when it genuinely adds value.`
 
               const message = await client.messages.create({
                 model: 'claude-opus-4-6',

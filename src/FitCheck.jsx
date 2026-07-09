@@ -1,32 +1,36 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "./supabase";
 
+// ── Colors ─────────────────────────────────────────────────────────────────
+
 const C = {
-  bg:            "#F4F4F5",
-  surface:       "#FFFFFF",
-  surfaceHigh:   "#F0F0F1",
-  purple:        "#8B5CF6",
-  purpleLight:   "#A78BFA",
-  white:         "#FFFFFF",
-  text:          "#0A0A0A",
-  textSecondary: "#71717A",
-  border:        "#E4E4E7",
-  muted:         "#71717A",
+  bg:           "#FFFFFF",
+  surface:      "#FFFFFF",
+  surfaceHigh:  "#F4F4F5",
+  purple:       "#8B5CF6",
+  purpleLight:  "#A78BFA",
+  white:        "#FFFFFF",
+  text:         "#0A0A0A",
+  border:       "#E4E4E7",
+  muted:        "#71717A",
+  sidebarBg:    "#18181B",
+  sidebarText:  "#E4E4E7",
+  sidebarMuted: "#52525B",
+  sidebarActive:"#3F3F46",
 };
 
-const CATEGORIES = [
-  "Casual", "Streetwear", "Business Casual", "Chic",
-  "Formal", "Athletic", "Date Night", "Going Out", "Festival", "Vintage",
+const PROFILE_DEFAULTS = {
+  name: "", gender: "", fit_preference: "", budget: "", favorite_brands: "", climate: "",
+};
+
+const STARTERS = [
+  "I'm going to a rooftop party — help me pick 📸",
+  "Rate my outfit options for tonight",
+  "I need a date night look",
+  "What should I wear to a casual brunch?",
 ];
 
-const ACTION_STYLE = {
-  add:    { label: "ADD",    color: "#16A34A", bg: "#F0FDF4" },
-  swap:   { label: "SWAP",   color: "#D97706", bg: "#FFFBEB" },
-  remove: { label: "REMOVE", color: "#DC2626", bg: "#FFF1F2" },
-  wear:   { label: "WEAR",   color: "#7C3AED", bg: "#F3F0FF" },
-};
-
-const PROFILE_DEFAULTS = { name: "", gender: "", fit_preference: "", budget: "", favorite_brands: "", climate: "" };
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 function parseChatMessage(text) {
   const parts = [];
@@ -40,6 +44,25 @@ function parseChatMessage(text) {
   if (last < text.length) parts.push({ type: "text", content: text.slice(last) });
   return parts.length ? parts : [{ type: "text", content: text }];
 }
+
+const compressImage = (file) => new Promise((resolve) => {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const MAX = 1200;
+    let { width, height } = img;
+    if (width > MAX || height > MAX) {
+      if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+      else { width = Math.round(width * MAX / height); height = MAX; }
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+    URL.revokeObjectURL(url);
+    resolve({ base64: canvas.toDataURL("image/jpeg", 0.85), mimeType: "image/jpeg" });
+  };
+  img.src = url;
+});
 
 const compressClosetImage = (file) => new Promise((resolve) => {
   const img = new Image();
@@ -60,98 +83,184 @@ const compressClosetImage = (file) => new Promise((resolve) => {
   img.src = url;
 });
 
-const compressImage = (file) => new Promise((resolve) => {
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.onload = () => {
-    const MAX = 1500;
-    let { width, height } = img;
-    if (width > MAX || height > MAX) {
-      if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
-      else { width = Math.round(width * MAX / height); height = MAX; }
-    }
-    const canvas = document.createElement("canvas");
-    canvas.width = width; canvas.height = height;
-    canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-    URL.revokeObjectURL(url);
-    resolve(canvas.toDataURL("image/jpeg", 0.85));
-  };
-  img.src = url;
-});
+function groupByDate(items) {
+  const groups = {};
+  const now = new Date();
+  items.forEach(item => {
+    const diff = Math.floor((now - new Date(item.created_at)) / 86400000);
+    const label = diff === 0 ? "Today" : diff === 1 ? "Yesterday" : diff < 7 ? "This Week" : diff < 30 ? "This Month" : "Older";
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(item);
+  });
+  return groups;
+}
 
-const extractFrames = (blob, knownDuration) => new Promise((resolve) => {
-  const video = document.createElement("video");
-  const url = URL.createObjectURL(blob);
-  video.src = url; video.muted = true; video.playsInline = true;
-  const NUM = 5; const frames = [];
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  const doExtract = (duration) => {
-    const MAX = 720;
-    let w = video.videoWidth, h = video.videoHeight;
-    if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-    else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
-    canvas.width = w; canvas.height = h;
-    const times = Array.from({ length: NUM }, (_, i) => (i / (NUM - 1)) * duration);
-    let i = 0;
-    const next = () => { if (i >= times.length) { URL.revokeObjectURL(url); resolve(frames); return; } video.currentTime = times[i]; };
-    video.onseeked = () => { ctx.drawImage(video, 0, 0, w, h); frames.push(canvas.toDataURL("image/jpeg", 0.8)); i++; next(); };
-    next();
-  };
-  video.onloadedmetadata = () => {
-    if (!isFinite(video.duration)) {
-      video.currentTime = knownDuration || 15;
-      const onSeek = () => { video.removeEventListener("seeked", onSeek); doExtract(video.currentTime); };
-      video.addEventListener("seeked", onSeek);
-    } else { doExtract(video.duration); }
-  };
-  video.onerror = () => { URL.revokeObjectURL(url); resolve(frames); };
-  video.load();
-});
+// ── Sub-components ─────────────────────────────────────────────────────────
 
-function MoveCard({ move }) {
-  const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const s = ACTION_STYLE[move.action] || ACTION_STYLE.swap;
-  const shopUrl = `https://www.google.com/search?q=${encodeURIComponent(move.item)}&tbm=shop`;
-
-  useEffect(() => {
-    const key = import.meta.env.VITE_GOOGLE_CSE_KEY;
-    const cx = import.meta.env.VITE_GOOGLE_CSE_ID;
-    if (!key || !cx || !move.imageQuery) { setLoading(false); return; }
-    fetch(`https://www.googleapis.com/customsearch/v1?key=${key}&cx=${cx}&q=${encodeURIComponent(move.imageQuery)}&searchType=image&num=5&safe=active`)
-      .then(r => r.json())
-      .then(data => { setImages((data.items || []).map(i => ({ url: i.image?.thumbnailLink || i.link, page: i.image?.contextLink }))); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [move.imageQuery]);
-
+function WishlistButton({ label, query, onAdd }) {
+  const [added, setAdded] = useState(false);
   return (
-    <div style={{ background: s.bg, borderRadius: 16, border: "1px solid rgba(0,0,0,0.04)", overflow: "hidden" }}>
-      <div style={{ padding: "16px 18px 10px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
-          <span style={{ fontSize: 10, letterSpacing: "0.15em", color: s.color, fontWeight: 800, textTransform: "uppercase", background: `${s.color}18`, padding: "4px 10px", borderRadius: 7, flexShrink: 0 }}>{s.label}</span>
-          <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{move.item}</div>
-        </div>
-        <div style={{ fontSize: 12, color: C.muted, fontStyle: "italic", lineHeight: 1.5 }}>{move.reason}</div>
+    <button
+      onClick={() => { if (!added) { onAdd(label, query); setAdded(true); } }}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 3,
+        fontSize: 10, color: added ? C.muted : C.purple,
+        background: added ? "transparent" : `${C.purple}12`,
+        border: `1px solid ${added ? C.border : C.purple}40`,
+        borderRadius: 100, padding: "2px 8px",
+        cursor: added ? "default" : "pointer", fontWeight: 600,
+        marginLeft: 4, verticalAlign: "middle", transition: "all 0.2s",
+        fontFamily: "inherit",
+      }}>
+      {added ? "✓ saved" : "+ wishlist"}
+    </button>
+  );
+}
+
+function ChatBubble({ message, onAddWishlist }) {
+  const isUser = message.role === "user";
+
+  if (isUser) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, marginBottom: 16 }}>
+        {message.hasImagePlaceholder && (
+          <div style={{ background: `${C.purple}12`, borderRadius: 14, padding: "8px 14px", fontSize: 13, color: C.purple, border: `1px solid ${C.purple}30` }}>
+            📷 Photo
+          </div>
+        )}
+        {message.images && message.images.length > 0 && (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: 260 }}>
+            {message.images.map((img, i) => (
+              <div key={i} style={{
+                width: message.images.length === 1 ? 200 : 94,
+                height: message.images.length === 1 ? 260 : 94,
+                borderRadius: 14, overflow: "hidden", background: C.surfaceHigh, flexShrink: 0,
+              }}>
+                <img src={img.base64} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+            ))}
+          </div>
+        )}
+        {message.content && (
+          <div style={{
+            background: C.purple, color: C.white,
+            borderRadius: "18px 18px 4px 18px",
+            padding: "10px 16px", fontSize: 14, lineHeight: 1.55,
+            maxWidth: 280, wordBreak: "break-word",
+          }}>
+            {message.content}
+          </div>
+        )}
       </div>
-      <div className="fc-img-scroll" style={{ display: "flex", gap: 8, overflowX: "auto", padding: "8px 18px 16px", WebkitOverflowScrolling: "touch" }}>
-        {loading ? (
-          [0,1,2,3].map(i => <div key={i} style={{ flexShrink: 0, width: 88, height: 88, borderRadius: 12, background: `${s.color}12`, animation: "fc-pulse 1.5s ease infinite" }} />)
-        ) : images.map((img, i) => (
-          <a key={i} href={img.page || shopUrl} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, display: "block", textDecoration: "none" }}>
-            <div style={{ width: 88, height: 88, borderRadius: 12, overflow: "hidden", background: C.surfaceHigh }}>
-              <img src={img.url} alt={move.item} style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                onError={e => { e.target.closest('a').style.display = 'none'; }} />
-            </div>
-          </a>
+    );
+  }
+
+  const parts = parseChatMessage(message.content);
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 16 }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: "50%", background: C.purple,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 11, flexShrink: 0, color: C.white, fontWeight: 700,
+      }}>✦</div>
+      <div style={{
+        background: "#F4F4F5",
+        borderRadius: "18px 18px 18px 4px",
+        padding: "10px 16px", fontSize: 14, lineHeight: 1.6,
+        maxWidth: 300, wordBreak: "break-word", color: C.text,
+      }}>
+        {parts.map((part, i) => part.type === "text" ? (
+          <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part.content}</span>
+        ) : (
+          <span key={i}>
+            <a href={`https://www.google.com/search?q=${encodeURIComponent(part.query)}&tbm=shop`}
+              target="_blank" rel="noopener noreferrer"
+              style={{ color: C.purple, textDecoration: "underline", fontWeight: 500 }}>
+              {part.label}
+            </a>
+            <WishlistButton label={part.label} query={part.query} onAdd={onAddWishlist} />
+          </span>
         ))}
-        <a href={shopUrl} target="_blank" rel="noopener noreferrer"
-          style={{ flexShrink: 0, width: 88, height: 88, borderRadius: 12, background: `${s.color}12`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textDecoration: "none", gap: 4, border: `1px dashed ${s.color}40` }}>
-          <div style={{ fontSize: 20 }}>🛍</div>
-          <div style={{ fontSize: 9, color: s.color, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Shop All</div>
-        </a>
       </div>
     </div>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 16 }}>
+      <div style={{ width: 28, height: 28, borderRadius: "50%", background: C.purple, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0, color: C.white }}>✦</div>
+      <div style={{ background: "#F4F4F5", borderRadius: "18px 18px 18px 4px", padding: "13px 16px" }}>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: C.muted, animation: `fc-bounce 1.2s ease infinite ${i * 0.2}s` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Sidebar({ conversations, currentId, onSelect, onNewChat, onClose, isMobile, visible }) {
+  const groups = groupByDate(conversations);
+  const ORDER = ["Today", "Yesterday", "This Week", "This Month", "Older"];
+
+  const sidebarStyle = isMobile ? {
+    position: "fixed", top: 0, bottom: 0,
+    left: visible ? 0 : -280, width: 260,
+    zIndex: 50, transition: "left 0.25s ease",
+    background: C.sidebarBg, display: "flex", flexDirection: "column",
+  } : {
+    width: 260, flexShrink: 0,
+    background: C.sidebarBg, display: "flex", flexDirection: "column",
+  };
+
+  return (
+    <>
+      {isMobile && visible && (
+        <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 40 }} />
+      )}
+      <div style={sidebarStyle}>
+        <div style={{ padding: "20px 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ fontFamily: "'EB Garamond','Garamond',serif", fontSize: 20, color: C.white, letterSpacing: "0.08em" }}>STYLD</div>
+          {isMobile && (
+            <button onClick={onClose} style={{ background: "none", border: "none", color: C.sidebarMuted, cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
+          )}
+        </div>
+        <div style={{ padding: "8px 12px 12px", flexShrink: 0 }}>
+          <button onClick={onNewChat} className="fc-sidebar-new"
+            style={{ width: "100%", padding: "9px 14px", borderRadius: 10, border: `1px solid ${C.sidebarActive}`, background: "none", color: C.sidebarText, fontSize: 13, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
+            <span style={{ fontSize: 16, lineHeight: 1 }}>＋</span> New chat
+          </button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 8px 16px" }}>
+          {ORDER.filter(g => groups[g]).map(group => (
+            <div key={group}>
+              <div style={{ fontSize: 10, color: C.sidebarMuted, letterSpacing: "0.1em", textTransform: "uppercase", padding: "10px 8px 4px", fontWeight: 600 }}>{group}</div>
+              {groups[group].map(conv => (
+                <button key={conv.id} onClick={() => onSelect(conv.id)} className="fc-conv-item"
+                  style={{
+                    width: "100%", padding: "8px 10px", borderRadius: 8, border: "none",
+                    background: conv.id === currentId ? C.sidebarActive : "none",
+                    color: conv.id === currentId ? C.white : C.sidebarText,
+                    fontSize: 13, cursor: "pointer", textAlign: "left",
+                    fontFamily: "inherit", display: "block",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    marginBottom: 1,
+                  }}>
+                  {conv.title || "New conversation"}
+                </button>
+              ))}
+            </div>
+          ))}
+          {conversations.length === 0 && (
+            <div style={{ padding: "24px 10px", color: C.sidebarMuted, fontSize: 12, textAlign: "center" }}>
+              No conversations yet
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -160,7 +269,7 @@ function PillGroup({ options, value, onChange }) {
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
       {options.map(opt => (
         <button key={opt} onClick={() => onChange(value === opt ? "" : opt)}
-          style={{ padding: "7px 16px", borderRadius: 100, border: `1px solid ${value === opt ? C.purple : C.border}`, background: value === opt ? C.purple : C.surface, color: value === opt ? C.white : C.muted, fontSize: 12, fontWeight: 400, cursor: "pointer", transition: "all 0.2s", fontFamily: "inherit" }}>
+          style={{ padding: "7px 16px", borderRadius: 100, border: `1px solid ${value === opt ? C.purple : C.border}`, background: value === opt ? C.purple : C.white, color: value === opt ? C.white : C.muted, fontSize: 12, cursor: "pointer", transition: "all 0.2s", fontFamily: "inherit" }}>
           {opt}
         </button>
       ))}
@@ -168,54 +277,219 @@ function PillGroup({ options, value, onChange }) {
   );
 }
 
+function ProfilePanel({ profileForm, onChange, onSave, saving, onClose }) {
+  const fields = [
+    { label: "Name", key: "name", placeholder: "First name", type: "input" },
+    { label: "Gender", key: "gender", options: ["Woman", "Man", "Non-binary", "Prefer not to say"], type: "pill" },
+    { label: "Fit Preference", key: "fit_preference", options: ["Oversized", "Regular", "Slim"], type: "pill" },
+    { label: "Budget Per Item", key: "budget", options: ["Under $50", "$50–150", "$150–300", "$300+"], type: "pill" },
+    { label: "Favorite Brands", key: "favorite_brands", placeholder: "e.g. Zara, Nike, Aritzia…", type: "input" },
+    { label: "Climate", key: "climate", options: ["Warm", "Mild", "Cold"], type: "pill" },
+  ];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 200 }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} />
+      <div className="fc-panel" style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "100%", maxWidth: 440, background: C.white, overflowY: "auto", padding: "32px 28px", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 36 }}>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>Your Profile</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 18, color: C.muted, cursor: "pointer" }}>✕</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+          {fields.map(f => (
+            <div key={f.key}>
+              <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 10 }}>{f.label}</div>
+              {f.type === "input" ? (
+                <input value={profileForm[f.key]} onChange={e => onChange(f.key, e.target.value)} placeholder={f.placeholder}
+                  style={{ width: "100%", padding: "12px 16px", border: `1px solid ${C.border}`, background: C.surfaceHigh, fontSize: 13, color: C.text, borderRadius: 12, boxSizing: "border-box", fontFamily: "inherit", outline: "none" }} />
+              ) : (
+                <PillGroup options={f.options} value={profileForm[f.key]} onChange={v => onChange(f.key, v)} />
+              )}
+            </div>
+          ))}
+        </div>
+        <button onClick={onSave} disabled={saving}
+          style={{ width: "100%", padding: "15px", background: C.purple, color: C.white, border: "none", borderRadius: 14, fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 40, opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}>
+          {saving ? "Saving…" : "Save Profile"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ClosetPanel({ user, closet, setCloset, onClose }) {
+  const [tagging, setTagging] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editingLabel, setEditingLabel] = useState("");
+  const fileRef = useRef(null);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    setTagging(true);
+    try {
+      const base64 = await compressClosetImage(file);
+      const res = await fetch("/api/tag-item", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base64Image: base64, mimeType: "image/jpeg" }) });
+      const { label, item_type } = await res.json();
+      const { data } = await supabase.from("closet_items").insert({ user_id: user.id, image: base64, label: label || "Clothing item", item_type: item_type || "other" }).select().single();
+      if (data) setCloset(prev => [data, ...prev]);
+    } catch (err) { console.error(err); }
+    finally { setTagging(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+
+  const deleteItem = async (id) => {
+    await supabase.from("closet_items").delete().eq("id", id);
+    setCloset(prev => prev.filter(i => i.id !== id));
+  };
+
+  const saveLabel = async (id) => {
+    const label = editingLabel.trim(); if (!label) return;
+    await supabase.from("closet_items").update({ label }).eq("id", id);
+    setCloset(prev => prev.map(i => i.id === id ? { ...i, label } : i));
+    setEditingId(null);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 200 }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} />
+      <div className="fc-panel" style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "100%", maxWidth: 440, background: C.white, display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "24px 24px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>My Closet</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 18, color: C.muted, cursor: "pointer" }}>✕</button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>Add photos of items you own — your stylist will reference them.</div>
+          <input type="file" ref={fileRef} onChange={handleFile} accept="image/*" style={{ display: "none" }} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            <div onClick={() => !tagging && fileRef.current?.click()}
+              style={{ aspectRatio: "1", border: `1px dashed ${C.border}`, borderRadius: 12, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: tagging ? "default" : "pointer", background: C.surfaceHigh, gap: 6 }}>
+              {tagging ? (
+                <div style={{ width: 20, height: 20, border: `2px solid ${C.border}`, borderTopColor: C.purple, borderRadius: "50%", animation: "fc-spin 0.9s linear infinite" }} />
+              ) : (
+                <>
+                  <div style={{ fontSize: 22, color: C.muted, lineHeight: 1 }}>+</div>
+                  <div style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted }}>Add</div>
+                </>
+              )}
+            </div>
+            {closet.map(item => (
+              <div key={item.id} style={{ position: "relative" }}>
+                <div style={{ aspectRatio: "1", overflow: "hidden", background: C.surfaceHigh, borderRadius: 12, marginBottom: 6 }}>
+                  <img src={item.image} alt={item.label} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </div>
+                {editingId === item.id ? (
+                  <input autoFocus value={editingLabel} onChange={e => setEditingLabel(e.target.value)}
+                    onBlur={() => saveLabel(item.id)}
+                    onKeyDown={e => { if (e.key === "Enter") saveLabel(item.id); if (e.key === "Escape") setEditingId(null); }}
+                    style={{ width: "100%", fontSize: 10, color: C.text, border: "none", borderBottom: `1px solid ${C.purple}`, background: "transparent", outline: "none", fontFamily: "inherit", padding: "2px 0", boxSizing: "border-box" }} />
+                ) : (
+                  <div onClick={() => { setEditingId(item.id); setEditingLabel(item.label); }}
+                    style={{ fontSize: 10, color: C.text, lineHeight: 1.4, cursor: "text", paddingRight: 4 }}>{item.label}</div>
+                )}
+                <button onClick={() => deleteItem(item.id)}
+                  style={{ position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.5)", border: "none", color: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+              </div>
+            ))}
+          </div>
+          {closet.length === 0 && !tagging && (
+            <div style={{ textAlign: "center", paddingTop: 40 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 6 }}>No items yet</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Tap + to add your first piece.</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WishlistPanel({ user, onClose }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.from("wishlist_items").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
+      .then(({ data }) => { setItems(data || []); setLoading(false); });
+  }, [user.id]);
+
+  const remove = async (id) => {
+    await supabase.from("wishlist_items").delete().eq("id", id);
+    setItems(prev => prev.filter(i => i.id !== id));
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 200 }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} />
+      <div className="fc-panel" style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "100%", maxWidth: 440, background: C.white, display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "24px 24px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>Wishlist</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 18, color: C.muted, cursor: "pointer" }}>✕</button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+          {loading ? (
+            <div style={{ display: "flex", justifyContent: "center", paddingTop: 40 }}>
+              <div style={{ width: 22, height: 22, border: `2px solid ${C.border}`, borderTopColor: C.purple, borderRadius: "50%", animation: "fc-spin 0.9s linear infinite" }} />
+            </div>
+          ) : items.length === 0 ? (
+            <div style={{ textAlign: "center", paddingTop: 60 }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>🛍️</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 6 }}>Your wishlist is empty</div>
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.6 }}>When your stylist recommends items, tap "+ wishlist" to save them here.</div>
+            </div>
+          ) : items.map(item => (
+            <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ flex: 1, fontSize: 14, fontWeight: 500, color: C.text }}>{item.name}</div>
+              <a href={`https://www.google.com/search?q=${encodeURIComponent(item.image_query || item.name)}&tbm=shop`}
+                target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 11, color: C.purple, textDecoration: "none", fontWeight: 600, padding: "5px 12px", border: `1px solid ${C.purple}40`, borderRadius: 100, flexShrink: 0 }}>
+                Shop
+              </a>
+              <button onClick={() => remove(item.id)}
+                style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 18, lineHeight: 1, flexShrink: 0, padding: 2 }}>×</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────
+
 export default function FitCheck({ user, onSignOut }) {
-  const [stage, setStage] = useState("upload");
-  const [image, setImage] = useState(null);
-  const [frames, setFrames] = useState(null);
-  const [inspirationImage, setInspirationImage] = useState(null);
-  const [category, setCategory] = useState(null);
-  const [stylePrompt, setStylePrompt] = useState("");
-  const [analysis, setAnalysis] = useState(null);
-  const [error, setError] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [currentConvId, setCurrentConvId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [showInspiration, setShowInspiration] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [countdown, setCountdown] = useState(15);
-  const [cameraError, setCameraError] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
+  const [input, setInput] = useState("");
+  const [attachedImages, setAttachedImages] = useState([]);
+  const [sending, setSending] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [panel, setPanel] = useState(null);
   const [profileForm, setProfileForm] = useState(PROFILE_DEFAULTS);
   const [profileSaving, setProfileSaving] = useState(false);
   const [closet, setCloset] = useState([]);
-  const [closetTagging, setClosetTagging] = useState(false);
-  const [editingClosetId, setEditingClosetId] = useState(null);
-  const [editingClosetLabel, setEditingClosetLabel] = useState("");
-  const [eventPrompt, setEventPrompt] = useState("");
-  const [isPlan, setIsPlan] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 700);
 
+  const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
-  const videoFileRef = useRef(null);
-  const inspirationRef = useRef(null);
-  const closetInputRef = useRef(null);
-  const chatEndRef = useRef(null);
-  const liveVideoRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
-  const countdownRef = useRef(null);
-  const streamRef = useRef(null);
-  const recordingStartRef = useRef(null);
-  const frameCaptureRef = useRef([]);
-  const frameCaptureIntervalRef = useRef(null);
 
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, chatLoading]);
-  useEffect(() => { return () => stopStream(); }, []);
-  useEffect(() => { if (user) { loadProfile(); loadCloset(); } }, [user]);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 700);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
-  const stopStream = () => {
-    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+  useEffect(() => {
+    if (user) { loadConversations(); loadProfile(); loadCloset(); }
+  }, [user]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, sending]);
+
+  const loadConversations = async () => {
+    const { data } = await supabase.from("conversations").select("id, title, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+    setConversations(data || []);
   };
 
   const loadProfile = async () => {
@@ -223,703 +497,264 @@ export default function FitCheck({ user, onSignOut }) {
     if (data) setProfileForm(data);
   };
 
-  const saveProfile = async () => {
-    setProfileSaving(true);
-    await supabase.from("profiles").upsert({ id: user.id, ...profileForm, updated_at: new Date().toISOString() });
-    setProfileSaving(false);
-    setShowProfile(false);
-  };
-
-  const updateProfile = (key, val) => setProfileForm(p => ({ ...p, [key]: val }));
-
   const loadCloset = async () => {
-    if (!user) return;
     const { data } = await supabase.from("closet_items").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
     setCloset(data || []);
   };
 
-  const handleClosetFile = async (e) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    setClosetTagging(true);
-    try {
-      const base64 = await compressClosetImage(file);
-      const res = await fetch("/api/tag-item", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base64Image: base64, mimeType: "image/jpeg" }) });
-      const { label, item_type } = await res.json();
-      const { data } = await supabase.from("closet_items").insert({ user_id: user.id, image: base64, label: label || "Clothing item", item_type: item_type || "other" }).select().single();
-      if (data) setCloset(prev => [data, ...prev]);
-    } catch (err) { console.error("Failed to tag item:", err); }
-    finally { setClosetTagging(false); if (closetInputRef.current) closetInputRef.current.value = ""; }
+  const selectConversation = async (convId) => {
+    setCurrentConvId(convId);
+    setSidebarOpen(false);
+    const { data } = await supabase.from("messages").select("*").eq("conversation_id", convId).order("created_at", { ascending: true });
+    setMessages((data || []).map(m => ({
+      role: m.role, content: m.content,
+      hasImagePlaceholder: m.has_images, images: null,
+    })));
+    setAttachedImages([]);
+    setInput("");
   };
 
-  const deleteClosetItem = async (id) => {
-    await supabase.from("closet_items").delete().eq("id", id);
-    setCloset(prev => prev.filter(item => item.id !== id));
+  const startNewChat = () => {
+    setCurrentConvId(null);
+    setMessages([]);
+    setAttachedImages([]);
+    setInput("");
+    setSidebarOpen(false);
+    setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
-  const saveClosetLabel = async (id) => {
-    const label = editingClosetLabel.trim();
-    if (!label) return;
-    await supabase.from("closet_items").update({ label }).eq("id", id);
-    setCloset(prev => prev.map(item => item.id === id ? { ...item, label } : item));
-    setEditingClosetId(null);
+  const handleImageAttach = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const compressed = await Promise.all(files.map(compressImage));
+    setAttachedImages(prev => [...prev, ...compressed]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const loadHistory = useCallback(async () => {
+  const addToWishlist = async (name, imageQuery) => {
     if (!user) return;
-    setHistoryLoading(true);
-    const { data } = await supabase.from("fit_history").select("id, image, frames, category, style_prompt, analysis, created_at").order("created_at", { ascending: false }).limit(24);
-    setHistory(data || []);
-    setHistoryLoading(false);
-  }, [user]);
-
-  const viewHistoryItem = (item) => {
-    setImage(item.image); setFrames(item.frames); setCategory(item.category);
-    setStylePrompt(item.style_prompt || ""); setAnalysis(item.analysis);
-    setMessages([{ role: "assistant", content: item.analysis.question }]);
-    setStage("results");
+    await supabase.from("wishlist_items").insert({ user_id: user.id, name, image_query: imageQuery });
   };
 
-  const startCamera = async () => {
-    setCameraError(null);
+  const send = async () => {
+    const text = input.trim();
+    if (!text && attachedImages.length === 0) return;
+    if (sending) return;
+
+    const newMsg = { role: "user", content: text, images: attachedImages.length > 0 ? [...attachedImages] : null, hasImagePlaceholder: false };
+    const updatedMessages = [...messages, newMsg];
+    setMessages(updatedMessages);
+    setInput("");
+    setAttachedImages([]);
+    if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
+    setSending(true);
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "user" } }, audio: false });
-      streamRef.current = stream; setStage("recording");
-      setTimeout(() => { if (liveVideoRef.current) liveVideoRef.current.srcObject = stream; }, 50);
-    } catch { setCameraError("Camera access was denied. Allow camera access in your browser settings, or upload a video instead."); }
-  };
-
-  const captureFrameFromCamera = () => {
-    const video = liveVideoRef.current;
-    if (!video || video.readyState < 2) return;
-    const MAX = 720; let w = video.videoWidth, h = video.videoHeight;
-    if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
-    const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
-    canvas.getContext("2d").drawImage(video, 0, 0, w, h);
-    frameCaptureRef.current.push(canvas.toDataURL("image/jpeg", 0.8));
-  };
-
-  const startRecording = () => {
-    chunksRef.current = []; frameCaptureRef.current = [];
-    const mr = new MediaRecorder(streamRef.current); mediaRecorderRef.current = mr;
-    mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-    mr.onstop = () => { clearInterval(frameCaptureIntervalRef.current); stopStream(); setFrames(frameCaptureRef.current.length > 0 ? [...frameCaptureRef.current] : null); setStage("configure"); };
-    mr.start(); recordingStartRef.current = Date.now();
-    frameCaptureIntervalRef.current = setInterval(captureFrameFromCamera, 3000);
-    setRecording(true); setCountdown(15);
-    countdownRef.current = setInterval(() => { setCountdown(prev => { if (prev <= 1) { stopRecording(); return 0; } return prev - 1; }); }, 1000);
-  };
-
-  const stopRecording = useCallback(() => {
-    clearInterval(countdownRef.current); clearInterval(frameCaptureIntervalRef.current);
-    if (mediaRecorderRef.current?.state !== "inactive") mediaRecorderRef.current.stop();
-    setRecording(false);
-  }, []);
-
-  const handleFile = useCallback(async (e) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    const base64 = await compressImage(file); setImage(base64); setFrames(null); setStage("configure");
-  }, []);
-
-  const handleVideoFile = useCallback(async (e) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    setStage("analyzing"); const extracted = await extractFrames(file); setFrames(extracted); setImage(null); setStage("configure");
-  }, []);
-
-  const handleInspirationFile = useCallback(async (e) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    const base64 = await compressImage(file); setInspirationImage(base64);
-  }, []);
-
-  const analyze = async () => {
-    setStage("analyzing"); setError(null);
-    try {
-      const profile = Object.values(profileForm).some(v => v) ? profileForm : null;
-      const closetLabels = closet.map(i => i.label).filter(Boolean);
-      const body = frames
-        ? { frames, category, stylePrompt, inspirationImage, isVideo: true, profile, closetItems: closetLabels }
-        : { base64Image: image, mimeType: "image/jpeg", category, stylePrompt, inspirationImage, profile, closetItems: closetLabels };
-      const res = await fetch("/api/analyze-fit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-      const data = await res.json();
-      setAnalysis(data); setMessages([{ role: "assistant", content: data.question }]); setStage("results");
-      if (user) {
-        supabase.from("fit_history").insert({ user_id: user.id, image: frames ? null : image, frames: frames || null, category, style_prompt: stylePrompt, analysis: data }).then(() => {});
+      let convId = currentConvId;
+      if (!convId) {
+        const title = text.slice(0, 45) || (attachedImages.length > 0 ? "Outfit check" : "New chat");
+        const { data } = await supabase.from("conversations").insert({ user_id: user.id, title }).select().single();
+        convId = data.id;
+        setCurrentConvId(convId);
+        setConversations(prev => [data, ...prev]);
       }
-    } catch (err) { setError(err.message); setStage("configure"); }
-  };
 
-  const planOutfit = async () => {
-    if (!eventPrompt.trim()) return;
-    setStage("analyzing"); setError(null); setIsPlan(true);
-    try {
-      const profile = Object.values(profileForm).some(v => v) ? profileForm : null;
-      const closetLabels = closet.map(i => i.label).filter(Boolean);
-      const res = await fetch("/api/plan-outfit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventPrompt: eventPrompt.trim(), profile, closetItems: closetLabels }) });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-      const data = await res.json();
-      setAnalysis(data); setStylePrompt(eventPrompt.trim()); setCategory(null);
-      setMessages([{ role: "assistant", content: data.question }]); setStage("results");
-      if (user) {
-        supabase.from("fit_history").insert({ user_id: user.id, image: null, frames: null, category: "Outfit Plan", style_prompt: eventPrompt.trim(), analysis: data }).then(() => {});
-      }
-    } catch (err) { setError(err.message); setStage("upload"); setIsPlan(false); }
-  };
+      await supabase.from("messages").insert({
+        conversation_id: convId, role: "user",
+        content: text, has_images: !!(newMsg.images && newMsg.images.length > 0),
+      });
 
-  const sendMessage = async () => {
-    if (!chatInput.trim() || chatLoading) return;
-    const userMsg = { role: "user", content: chatInput.trim() };
-    const updated = [...messages, userMsg];
-    setMessages(updated); setChatInput(""); setChatLoading(true);
-    try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: updated, context: { category, stylePrompt, analysis } }) });
-      const data = await res.json();
-      setMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
-    } catch { setMessages(prev => [...prev, { role: "assistant", content: "Something went wrong — try again?" }]); }
-    finally { setChatLoading(false); }
-  };
-
-  const shareCard = async () => {
-    await document.fonts.ready;
-    const src = frames?.[0] || image;
-    if (!src) return;
-    const W = 1080, H = 1350;
-    const canvas = document.createElement("canvas");
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext("2d");
-    const img = new Image();
-    img.onload = () => {
-      ctx.fillStyle = "#F4F4F5"; ctx.fillRect(0, 0, W, H);
-      const ia = img.width / img.height, ca = W / H;
-      let dw, dh, dx, dy;
-      if (ia > ca) { dh = H; dw = H * ia; dx = (W - dw) / 2; dy = 0; }
-      else { dw = W; dh = W / ia; dx = 0; dy = (H - dh) / 2; }
-      ctx.drawImage(img, dx, dy, dw, dh);
-      const grad = ctx.createLinearGradient(0, H * 0.48, 0, H);
-      grad.addColorStop(0, "rgba(0,0,0,0)"); grad.addColorStop(1, "rgba(0,0,0,0.78)");
-      ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "italic 700 88px Georgia, 'Times New Roman', serif";
-      ctx.textAlign = "left"; ctx.fillText(analysis.vibe, 64, H - 140);
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.font = "500 30px Inter, Helvetica, sans-serif";
-      ctx.fillText("STYLD", 64, H - 76);
-      ctx.fillStyle = "#8B5CF6"; ctx.fillRect(0, H - 8, W, 8);
-      canvas.toBlob(async (blob) => {
-        const file = new File([blob], "styld-fit.jpg", { type: "image/jpeg" });
-        if (navigator.canShare?.({ files: [file] })) {
-          try { await navigator.share({ files: [file] }); } catch {}
-        } else {
-          const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "styld-fit.jpg"; a.click();
+      const apiMessages = updatedMessages.map(msg => {
+        if (msg.images && msg.images.length > 0) {
+          return {
+            role: msg.role,
+            content: [
+              ...msg.images.map(img => ({ type: "image", source: { type: "base64", media_type: img.mimeType, data: img.base64.replace(/^data:[^;]+;base64,/, "") } })),
+              ...(msg.content ? [{ type: "text", text: msg.content }] : []),
+            ],
+          };
         }
-      }, "image/jpeg", 0.92);
-    };
-    img.src = src;
+        return { role: msg.role, content: msg.content };
+      });
+
+      const profile = Object.values(profileForm).some(v => v) ? profileForm : null;
+      const closetLabels = closet.map(i => i.label).filter(Boolean);
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: apiMessages, profile, closetItems: closetLabels }),
+      });
+      const { reply } = await res.json();
+      const replyText = reply || "Something went wrong — try again?";
+
+      await supabase.from("messages").insert({ conversation_id: convId, role: "assistant", content: replyText, has_images: false });
+      setMessages(prev => [...prev, { role: "assistant", content: replyText }]);
+    } catch {
+      setMessages(prev => [...prev, { role: "assistant", content: "Something went wrong — try again?" }]);
+    } finally {
+      setSending(false);
+    }
   };
 
-  const reset = () => {
-    stopStream(); clearInterval(countdownRef.current); clearInterval(frameCaptureIntervalRef.current);
-    setStage("upload"); setImage(null); setFrames(null); setInspirationImage(null);
-    setCategory(null); setStylePrompt(""); setAnalysis(null);
-    setError(null); setMessages([]); setChatInput(""); setShowInspiration(false);
-    setRecording(false); setCountdown(15); setCameraError(null); setIsPlan(false); setEventPrompt("");
-    [fileInputRef, videoFileRef, inspirationRef].forEach(r => { if (r.current) r.current.value = ""; });
+  const headerBtnStyle = {
+    background: "none", border: "none", fontSize: 11,
+    letterSpacing: "0.15em", textTransform: "uppercase",
+    color: C.muted, cursor: "pointer", padding: "6px 10px",
+    borderRadius: 8, fontFamily: "inherit", transition: "background 0.15s",
   };
-
-  const headerBtn = { fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted, background: "none", border: "none", cursor: "pointer", fontWeight: 400, transition: "color 0.25s", fontFamily: "inherit" };
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter','SF Pro Display',-apple-system,Helvetica,sans-serif" }}>
+    <div style={{ height: "100vh", display: "flex", fontFamily: "'Inter','SF Pro Display',-apple-system,Helvetica,sans-serif", overflow: "hidden", background: C.bg }}>
       <style>{`
-        @keyframes fc-spin  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes fc-fade  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fc-slide { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fc-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.4; transform:scale(0.8); } }
-        @keyframes fc-panel { from { transform: translateX(100%); } to { transform: translateX(0); } }
-        .fc-fade  { animation: fc-fade  0.45s ease forwards; }
-        .fc-slide { animation: fc-slide 0.4s ease forwards; }
-        .fc-panel { animation: fc-panel 0.3s ease forwards; }
-        .fc-btn-primary:hover  { opacity: 0.85 !important; }
-        .fc-btn-surface:hover  { background: ${C.surfaceHigh} !important; border-color: ${C.purple} !important; }
-        .fc-back:hover         { color: ${C.text} !important; }
-        .fc-send:hover         { opacity: 0.8 !important; }
-        .fc-inspo:hover        { color: ${C.purpleLight} !important; }
-        .fc-share:hover        { background: ${C.surfaceHigh} !important; }
-        .fc-history-item:hover { opacity: 0.82; transform: translateY(-2px); }
-        .fc-categories { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
-        .fc-categories::-webkit-scrollbar { display:none; }
-        .fc-plan-input:focus { outline:none; border-color:${C.purple} !important; }
-        .fc-plan-input::placeholder { color:${C.muted}; }
-        .fc-img-scroll::-webkit-scrollbar { display:none; }
-        .fc-img-scroll { scrollbar-width:none; }
-        .fc-chat-input:focus { outline:none; border-color:${C.purple} !important; }
-        .fc-chat-input::placeholder { color:${C.muted}; }
-        .fc-textarea:focus { outline:none; border-color:${C.purple} !important; }
-        .fc-textarea::placeholder { color:${C.muted}; }
-        .fc-profile-input:focus { outline:none; border-color:${C.purple} !important; }
-        .fc-profile-input::placeholder { color:${C.muted}; }
-        .fc-main { padding: 0 48px 80px; max-width: 1100px; margin: 0 auto; }
-        .fc-results-grid { display:grid; grid-template-columns:1fr 1.5fr; gap:56px; align-items:start; padding-top:48px; }
-        .fc-history-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
-        .fc-image-sticky { position:sticky; top:24px; }
-        @media (max-width: 680px) {
-          .fc-main { padding: 0 16px 60px; }
-          .fc-results-grid { grid-template-columns:1fr; gap:28px; padding-top:24px; }
-          .fc-history-grid { grid-template-columns:repeat(2,1fr); }
-          .fc-image-sticky { position:static; }
-          .fc-header-pad { padding: 16px 20px !important; }
-        }
+        @keyframes fc-spin   { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fc-panel  { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes fc-bounce { 0%,80%,100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-5px); opacity: 1; } }
+        @keyframes fc-fade   { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .fc-panel     { animation: fc-panel 0.28s ease forwards; }
+        .fc-msg       { animation: fc-fade 0.25s ease forwards; }
+        .fc-sidebar-new:hover { background: ${C.sidebarActive} !important; }
+        .fc-conv-item:hover   { background: ${C.sidebarActive} !important; }
+        .fc-header-btn:hover  { background: ${C.surfaceHigh} !important; }
+        .fc-send:hover        { opacity: 0.85 !important; }
+        .fc-attach:hover      { background: #EBEBEC !important; }
+        .fc-starter:hover     { border-color: ${C.purple} !important; color: ${C.text} !important; }
+        textarea.fc-input:focus { outline: none; }
+        textarea.fc-input::placeholder { color: ${C.muted}; }
+        ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #D4D4D8; border-radius: 4px; }
       `}</style>
 
-      {/* Profile Panel */}
-      {showProfile && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200 }}>
-          <div onClick={() => setShowProfile(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} />
-          <div className="fc-panel" style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "100%", maxWidth: 440, background: C.white, overflowY: "auto", padding: "32px 28px", boxSizing: "border-box" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 36 }}>
-              <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>Your Profile</div>
-              <button onClick={() => setShowProfile(false)} style={{ background: "none", border: "none", fontSize: 18, color: C.muted, cursor: "pointer", lineHeight: 1 }}>✕</button>
-            </div>
+      {/* Sidebar */}
+      <Sidebar
+        conversations={conversations}
+        currentId={currentConvId}
+        onSelect={selectConversation}
+        onNewChat={startNewChat}
+        onClose={() => setSidebarOpen(false)}
+        isMobile={isMobile}
+        visible={sidebarOpen}
+      />
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 10 }}>Name</div>
-                <input className="fc-profile-input" value={profileForm.name} onChange={e => updateProfile("name", e.target.value)} placeholder="First name"
-                  style={{ width: "100%", padding: "12px 16px", border: `1px solid ${C.border}`, background: C.bg, fontSize: 13, color: C.text, borderRadius: 12, boxSizing: "border-box", fontFamily: "inherit", transition: "border-color 0.25s" }} />
-              </div>
+      {/* Chat area */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
 
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 10 }}>Gender</div>
-                <PillGroup options={["Woman", "Man", "Non-binary", "Prefer not to say"]} value={profileForm.gender} onChange={v => updateProfile("gender", v)} />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 10 }}>Fit Preference</div>
-                <PillGroup options={["Oversized", "Regular", "Slim"]} value={profileForm.fit_preference} onChange={v => updateProfile("fit_preference", v)} />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 10 }}>Budget Per Item</div>
-                <PillGroup options={["Under $50", "$50–150", "$150–300", "$300+"]} value={profileForm.budget} onChange={v => updateProfile("budget", v)} />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 10 }}>Favorite Brands</div>
-                <input className="fc-profile-input" value={profileForm.favorite_brands} onChange={e => updateProfile("favorite_brands", e.target.value)} placeholder="e.g. Zara, Nike, Aritzia…"
-                  style={{ width: "100%", padding: "12px 16px", border: `1px solid ${C.border}`, background: C.bg, fontSize: 13, color: C.text, borderRadius: 12, boxSizing: "border-box", fontFamily: "inherit", transition: "border-color 0.25s" }} />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 10 }}>Climate</div>
-                <PillGroup options={["Warm", "Mild", "Cold"]} value={profileForm.climate} onChange={v => updateProfile("climate", v)} />
-              </div>
-            </div>
-
-            <button onClick={saveProfile} disabled={profileSaving}
-              style={{ width: "100%", padding: "15px", background: C.purple, color: C.white, border: "none", borderRadius: 14, fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 40, opacity: profileSaving ? 0.6 : 1, transition: "opacity 0.25s", fontFamily: "inherit" }}>
-              {profileSaving ? "Saving…" : "Save Profile"}
-            </button>
-          </div>
+        {/* Header */}
+        <div style={{ padding: "12px 16px", background: C.white, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(true)} className="fc-header-btn"
+              style={{ ...headerBtnStyle, fontSize: 20, padding: "4px 8px" }}>≡</button>
+          )}
+          {isMobile && (
+            <div style={{ fontFamily: "'EB Garamond','Garamond',serif", fontSize: 18, letterSpacing: "0.08em", color: C.text }}>STYLD</div>
+          )}
+          <div style={{ flex: 1 }} />
+          {(["Closet", "Wishlist", "Profile"]).map(label => (
+            <button key={label} onClick={() => setPanel(label.toLowerCase())} className="fc-header-btn"
+              style={headerBtnStyle}>{label}</button>
+          ))}
+          <button onClick={onSignOut} className="fc-header-btn"
+            style={{ ...headerBtnStyle, color: C.border }}
+            onMouseEnter={e => e.currentTarget.style.color = C.muted}
+            onMouseLeave={e => e.currentTarget.style.color = C.border}>
+            Sign Out
+          </button>
         </div>
-      )}
 
-      {/* Header */}
-      <header className="fc-header-pad" style={{ padding: "20px 48px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: C.text }}>STYLD</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          {user && stage === "upload" && (<>
-            <button onClick={() => setShowProfile(true)} className="fc-back" style={headerBtn}>Profile</button>
-            <button onClick={() => setStage("closet")} className="fc-back" style={headerBtn}>Closet</button>
-            <button onClick={() => { loadHistory(); setStage("history"); }} className="fc-back" style={headerBtn}>History</button>
-          </>)}
-          {stage === "closet" && (
-            <button onClick={() => setStage("upload")} className="fc-back" style={headerBtn}>← Back</button>
-          )}
-          {stage !== "upload" && stage !== "closet" && (
-            <button onClick={reset} className="fc-back" style={headerBtn}>New Look</button>
-          )}
-          {user && (
-            <button onClick={onSignOut} style={{ ...headerBtn, color: C.border }}
-              onMouseEnter={e => e.currentTarget.style.color = C.muted}
-              onMouseLeave={e => e.currentTarget.style.color = C.border}>
-              Sign Out
-            </button>
-          )}
-        </div>
-      </header>
-
-      <main className="fc-main">
-
-        {/* ── UPLOAD ── */}
-        {stage === "upload" && (
-          <div className="fc-fade" style={{ paddingTop: 56, maxWidth: 520, margin: "0 auto" }}>
-            {cameraError && (
-              <div style={{ padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, color: "#DC2626", fontSize: 12, marginBottom: 20, lineHeight: 1.6, borderRadius: 14 }}>{cameraError}</div>
-            )}
-            <button onClick={startCamera} className="fc-btn-primary"
-              style={{ width: "100%", padding: "36px 20px", background: C.purple, color: C.white, border: "none", borderRadius: 20, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 12, transition: "opacity 0.25s" }}>
-              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>Record your fit check</div>
-              <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.6)", fontWeight: 400 }}>Up to 15 seconds</div>
-            </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <div style={{ flex: 1, height: 1, background: C.border }} />
-              <div style={{ fontSize: 11, color: C.muted, fontWeight: 400, letterSpacing: "0.1em" }}>or</div>
-              <div style={{ flex: 1, height: 1, background: C.border }} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <input type="file" ref={fileInputRef} onChange={handleFile} accept="image/*" style={{ display: "none" }} />
-              <input type="file" ref={videoFileRef} onChange={handleVideoFile} accept="video/*" style={{ display: "none" }} />
-              <input type="file" ref={closetInputRef} onChange={handleClosetFile} accept="image/*" style={{ display: "none" }} />
-              <button className="fc-btn-surface" onClick={() => fileInputRef.current?.click()}
-                style={{ padding: "18px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400, transition: "background 0.25s, border-color 0.25s" }}>
-                Upload Photo
-              </button>
-              <button className="fc-btn-surface" onClick={() => videoFileRef.current?.click()}
-                style={{ padding: "18px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400, transition: "background 0.25s, border-color 0.25s" }}>
-                Upload Video
-              </button>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 20, marginBottom: 12 }}>
-              <div style={{ flex: 1, height: 1, background: C.border }} />
-              <div style={{ fontSize: 11, color: C.muted, fontWeight: 400, letterSpacing: "0.1em" }}>or plan an outfit</div>
-              <div style={{ flex: 1, height: 1, background: C.border }} />
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input className="fc-plan-input" value={eventPrompt} onChange={e => setEventPrompt(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && planOutfit()}
-                placeholder="What's the occasion? e.g. day party in Brooklyn…"
-                style={{ flex: 1, padding: "14px 18px", border: `1px solid ${C.border}`, background: C.surface, fontSize: 13, color: C.text, borderRadius: 14, transition: "border-color 0.25s", fontFamily: "inherit" }} />
-              <button onClick={planOutfit} disabled={!eventPrompt.trim()} className="fc-btn-primary"
-                style={{ padding: "14px 18px", background: C.purple, color: C.white, border: "none", borderRadius: 14, fontSize: 18, cursor: eventPrompt.trim() ? "pointer" : "default", opacity: eventPrompt.trim() ? 1 : 0.35, transition: "opacity 0.25s", fontFamily: "inherit" }}>
-                →
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── RECORDING ── */}
-        {stage === "recording" && (
-          <div className="fc-fade" style={{ paddingTop: 24, maxWidth: 520, margin: "0 auto" }}>
-            <div style={{ position: "relative", background: "#000", overflow: "hidden", borderRadius: 20 }}>
-              <video ref={liveVideoRef} autoPlay playsInline muted style={{ width: "100%", display: "block", maxHeight: "65vh", objectFit: "cover" }} />
-              {recording && (
-                <div style={{ position: "absolute", top: 16, left: 0, right: 0, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444", animation: "fc-pulse 1.2s ease infinite" }} />
-                  <span style={{ color: C.white, fontSize: 13, fontWeight: 500, letterSpacing: "0.1em" }}>{countdown}s</span>
+        {/* Messages */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "24px 20px", background: C.white }}>
+          <div style={{ maxWidth: 640, margin: "0 auto" }}>
+            {messages.length === 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: 28, textAlign: "center" }}>
+                <div>
+                  <div style={{ fontFamily: "'EB Garamond','Garamond',serif", fontSize: 34, color: C.text, letterSpacing: "0.04em", marginBottom: 10 }}>Your Stylist</div>
+                  <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.7, maxWidth: 320 }}>Send a photo of your outfit options and tell me what you're going for.</div>
                 </div>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-              {!recording ? (
-                <button onClick={startRecording} className="fc-btn-primary"
-                  style={{ flex: 1, padding: "16px", background: "#EF4444", color: C.white, border: "none", borderRadius: 14, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontWeight: 500, transition: "opacity 0.25s" }}>
-                  Record
-                </button>
-              ) : (
-                <button onClick={stopRecording} className="fc-btn-primary"
-                  style={{ flex: 1, padding: "16px", background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", cursor: "pointer", fontWeight: 500, transition: "opacity 0.25s" }}>
-                  Stop
-                </button>
-              )}
-              <button onClick={() => { stopStream(); clearInterval(countdownRef.current); setRecording(false); setStage("upload"); }}
-                style={{ padding: "16px 20px", background: C.surface, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", fontWeight: 400 }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── CONFIGURE ── */}
-        {stage === "configure" && (
-          <div className="fc-slide" style={{ paddingTop: 40, maxWidth: 600, margin: "0 auto" }}>
-            <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 32 }}>
-              {frames ? (
-                <div style={{ display: "flex", gap: 3, flex: "0 0 auto" }}>
-                  {[0, 2, 4].map(i => frames[i] && (
-                    <div key={i} style={{ width: 56, aspectRatio: "9/16", overflow: "hidden", background: C.surface, borderRadius: 10 }}>
-                      <img src={frames[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", maxWidth: 380 }}>
+                  {STARTERS.map(s => (
+                    <button key={s} className="fc-starter" onClick={() => setInput(s)}
+                      style={{ padding: "9px 18px", borderRadius: 100, border: `1px solid ${C.border}`, background: C.white, color: C.muted, fontSize: 13, cursor: "pointer", transition: "all 0.2s", fontFamily: "inherit" }}>
+                      {s}
+                    </button>
                   ))}
                 </div>
-              ) : (
-                <div style={{ flex: "0 0 90px", aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 12 }}>
-                  <img src={image} alt="Your fit" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                </div>
-              )}
-              <div style={{ flex: 1, paddingTop: 4 }}>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: C.text, marginBottom: 6 }}>{frames ? "Nice moves." : "Looking good."}</div>
-                <div style={{ fontSize: 12, color: C.muted, fontWeight: 400, lineHeight: 1.7 }}>Tell your stylist a bit more for the best read.</div>
-              </div>
-            </div>
-
-            {error && <div style={{ padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, color: "#DC2626", fontSize: 12, marginBottom: 20, borderRadius: 14 }}>{error}</div>}
-
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>Style Category</div>
-              <div className="fc-categories">
-                {CATEGORIES.map(cat => (
-                  <button key={cat} onClick={() => setCategory(cat === category ? null : cat)}
-                    style={{ padding: "8px 18px", borderRadius: 100, border: `1px solid ${category === cat ? C.purple : C.border}`, background: category === cat ? C.purple : C.surface, color: category === cat ? C.white : C.muted, fontSize: 11, fontWeight: 400, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s", fontFamily: "inherit" }}>
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 12 }}>What's the look?</div>
-              <textarea className="fc-textarea" value={stylePrompt} onChange={e => setStylePrompt(e.target.value)}
-                placeholder="e.g. going for a clean minimal vibe, dinner with friends…" rows={3}
-                style={{ width: "100%", padding: "14px 16px", border: `1px solid ${C.border}`, background: C.surface, fontSize: 13, fontWeight: 400, color: C.text, lineHeight: 1.6, resize: "none", borderRadius: 14, boxSizing: "border-box", transition: "border-color 0.25s", fontFamily: "inherit" }} />
-            </div>
-
-            <div style={{ marginBottom: 36 }}>
-              <button className="fc-inspo" onClick={() => setShowInspiration(v => !v)}
-                style={{ background: "none", border: "none", padding: 0, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted, fontWeight: 400, cursor: "pointer", transition: "color 0.25s", fontFamily: "inherit" }}>
-                {showInspiration ? "− Remove Inspiration" : "+ Add Inspiration Photo"}
-              </button>
-              {showInspiration && (
-                <div style={{ marginTop: 16 }}>
-                  <input type="file" ref={inspirationRef} onChange={handleInspirationFile} accept="image/*" style={{ display: "none" }} />
-                  {inspirationImage ? (
-                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                      <div style={{ width: 64, height: 64, overflow: "hidden", background: C.surface, borderRadius: 10 }}>
-                        <img src={inspirationImage} alt="Inspiration" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      </div>
-                      <button onClick={() => { setInspirationImage(null); if (inspirationRef.current) inspirationRef.current.value = ""; }}
-                        style={{ background: "none", border: "none", fontSize: 11, color: C.muted, cursor: "pointer", letterSpacing: "0.15em", textTransform: "uppercase", fontFamily: "inherit" }}>
-                        Remove
-                      </button>
-                    </div>
-                  ) : (
-                    <div onClick={() => inspirationRef.current?.click()}
-                      style={{ border: `1px dashed ${C.border}`, padding: "22px", textAlign: "center", cursor: "pointer", background: C.surface, borderRadius: 14 }}>
-                      <div style={{ fontSize: 12, color: C.muted, fontWeight: 400 }}>Tap to upload inspiration photo</div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <button onClick={analyze} className="fc-btn-primary"
-              style={{ width: "100%", padding: "16px", background: C.purple, color: C.white, border: "none", fontSize: 13, letterSpacing: "0.05em", fontWeight: 600, cursor: "pointer", transition: "opacity 0.25s", borderRadius: 14, fontFamily: "inherit" }}>
-              Analyze My Fit
-            </button>
-          </div>
-        )}
-
-        {/* ── CLOSET ── */}
-        {stage === "closet" && (
-          <div className="fc-fade" style={{ paddingTop: 48 }}>
-            <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>My Closet</div>
-            <div style={{ fontSize: 12, color: C.muted, marginBottom: 28, lineHeight: 1.6 }}>Add photos of items you own — your stylist will reference them during analysis.</div>
-            <input type="file" ref={closetInputRef} onChange={handleClosetFile} accept="image/*" style={{ display: "none" }} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-              <div onClick={() => !closetTagging && closetInputRef.current?.click()}
-                style={{ aspectRatio: "1", border: `1px dashed ${C.border}`, borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: closetTagging ? "default" : "pointer", background: C.surface, gap: 8, transition: "border-color 0.2s" }}>
-                {closetTagging ? (
-                  <div style={{ width: 22, height: 22, border: `2px solid ${C.border}`, borderTopColor: C.purple, borderRadius: "50%", animation: "fc-spin 0.9s linear infinite" }} />
-                ) : (
-                  <>
-                    <div style={{ fontSize: 24, color: C.muted, lineHeight: 1 }}>+</div>
-                    <div style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: C.muted, fontWeight: 400 }}>Add Item</div>
-                  </>
-                )}
-              </div>
-              {closet.map(item => (
-                <div key={item.id} style={{ position: "relative" }}>
-                  <div style={{ aspectRatio: "1", overflow: "hidden", background: C.surface, borderRadius: 14, marginBottom: 6 }}>
-                    <img src={item.image} alt={item.label} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  </div>
-                  {editingClosetId === item.id ? (
-                    <input
-                      autoFocus
-                      value={editingClosetLabel}
-                      onChange={e => setEditingClosetLabel(e.target.value)}
-                      onBlur={() => saveClosetLabel(item.id)}
-                      onKeyDown={e => { if (e.key === "Enter") saveClosetLabel(item.id); if (e.key === "Escape") setEditingClosetId(null); }}
-                      style={{ width: "100%", fontSize: 11, color: C.text, fontWeight: 400, lineHeight: 1.4, border: "none", borderBottom: `1px solid ${C.purple}`, background: "transparent", outline: "none", fontFamily: "inherit", padding: "2px 0", boxSizing: "border-box" }}
-                    />
-                  ) : (
-                    <div onClick={() => { setEditingClosetId(item.id); setEditingClosetLabel(item.label); }}
-                      style={{ fontSize: 11, color: C.text, fontWeight: 400, lineHeight: 1.4, paddingRight: 4, cursor: "text" }}>{item.label}</div>
-                  )}
-                  <button onClick={() => deleteClosetItem(item.id)}
-                    style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.45)", border: "none", color: "#fff", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, fontFamily: "inherit" }}>
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-            {closet.length === 0 && !closetTagging && (
-              <div style={{ paddingTop: 48, textAlign: "center" }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>No items yet</div>
-                <div style={{ fontSize: 13, color: C.muted }}>Tap + to add your first piece.</div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── ANALYZING ── */}
-        {stage === "analyzing" && (
-          <div className="fc-fade" style={{ paddingTop: 80, display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-            <div style={{ width: 28, height: 28, border: `2px solid ${C.border}`, borderTopColor: C.purple, borderRadius: "50%", animation: "fc-spin 0.9s linear infinite" }} />
-            <div style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 400 }}>{isPlan ? "Building your outfit…" : frames ? "Reading your video…" : "Reading your fit…"}</div>
-          </div>
-        )}
-
-        {/* ── HISTORY ── */}
-        {stage === "history" && (
-          <div className="fc-fade" style={{ paddingTop: 48 }}>
-            <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 24 }}>Your Fits</div>
-            {historyLoading ? (
-              <div style={{ display: "flex", justifyContent: "center", paddingTop: 40 }}>
-                <div style={{ width: 24, height: 24, border: `2px solid ${C.border}`, borderTopColor: C.purple, borderRadius: "50%", animation: "fc-spin 0.9s linear infinite" }} />
-              </div>
-            ) : history.length === 0 ? (
-              <div style={{ textAlign: "center", paddingTop: 60 }}>
-                <div style={{ fontSize: 16, fontWeight: 600, color: C.text, marginBottom: 8 }}>No fits yet</div>
-                <div style={{ fontSize: 13, color: C.muted }}>Submit your first look to get started.</div>
               </div>
             ) : (
-              <div className="fc-history-grid">
-                {history.map(item => {
-                  const thumb = item.frames?.[0] || item.image;
-                  const date = new Date(item.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                  return (
-                    <div key={item.id} className="fc-history-item" onClick={() => viewHistoryItem(item)} style={{ cursor: "pointer", transition: "opacity 0.2s, transform 0.2s" }}>
-                      <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 14, marginBottom: 8 }}>
-                        {thumb && <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
-                      </div>
-                      <div style={{ fontSize: 13, fontWeight: 400, fontStyle: "italic", fontFamily: "'EB Garamond','Garamond',serif", color: C.text, marginBottom: 2 }}>{item.analysis?.vibe}</div>
-                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 400 }}>{date}</div>
-                    </div>
-                  );
-                })}
-              </div>
+              <>
+                {messages.map((msg, i) => (
+                  <div key={i} className="fc-msg">
+                    <ChatBubble message={msg} onAddWishlist={addToWishlist} />
+                  </div>
+                ))}
+                {sending && <TypingIndicator />}
+                <div ref={messagesEndRef} />
+              </>
             )}
           </div>
-        )}
+        </div>
 
-        {/* ── RESULTS ── */}
-        {stage === "results" && analysis && (
-          <div className="fc-fade">
-            <div className="fc-results-grid" style={{ paddingTop: 40 }}>
-              {/* Left — annotated photo card + breakdown tiles */}
-              <div className="fc-image-sticky">
-                {isPlan ? (
-                  <>
-                    <div style={{ position: "relative", background: "#0A0A0A", borderRadius: 20, padding: "28px 22px", minHeight: 180, overflow: "hidden" }}>
-                      <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", fontWeight: 500, marginBottom: 14 }}>The Occasion</div>
-                      <div style={{ fontFamily: "'EB Garamond','Garamond',serif", fontSize: 22, fontWeight: 400, fontStyle: "italic", color: C.white, lineHeight: 1.4 }}>"{stylePrompt}"</div>
-                    </div>
-                    {closet.length > 0 && (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>Your Closet</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                          {closet.slice(0, 6).map(item => (
-                            <div key={item.id} style={{ aspectRatio: "1", overflow: "hidden", background: C.surface, borderRadius: 10 }}>
-                              <img src={item.image} alt={item.label} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div style={{ position: "relative", aspectRatio: "3/4", overflow: "hidden", borderRadius: 20, background: C.surface }}>
-                    <img
-                      src={frames?.[0] || image}
-                      alt="Your fit"
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 38%, rgba(0,0,0,0.85) 100%)" }} />
-                    <div style={{ position: "absolute", bottom: 52, left: 18, right: 18 }}>
-                      <div style={{ fontFamily: "'EB Garamond','Garamond','Times New Roman',serif", fontSize: 42, fontWeight: 400, fontStyle: "italic", color: C.white, lineHeight: 1.1, textShadow: "0 2px 16px rgba(0,0,0,0.5)" }}>{analysis.vibe}</div>
-                    </div>
-                    <button onClick={shareCard} className="fc-share"
-                      style={{ position: "absolute", bottom: 14, right: 14, padding: "7px 14px", background: "rgba(255,255,255,0.15)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10, fontSize: 10, fontWeight: 600, color: C.white, cursor: "pointer", letterSpacing: "0.12em", textTransform: "uppercase", transition: "background 0.2s", fontFamily: "inherit" }}>
-                      Share
-                    </button>
-                    {frames && (
-                      <div style={{ position: "absolute", bottom: 14, left: 14, display: "flex", gap: 4 }}>
-                        {frames.slice(1, 4).map((f, i) => (
-                          <div key={i} style={{ width: 32, aspectRatio: "9/16", overflow: "hidden", borderRadius: 6, border: "1px solid rgba(255,255,255,0.3)" }}>
-                            <img src={f} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
+        {/* Input bar */}
+        <div style={{ padding: "10px 16px 16px", background: C.white, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ maxWidth: 640, margin: "0 auto" }}>
+            {/* Image previews */}
+            {attachedImages.length > 0 && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                {attachedImages.map((img, i) => (
+                  <div key={i} style={{ position: "relative", width: 56, height: 56, borderRadius: 10, overflow: "hidden", background: C.surfaceHigh, flexShrink: 0 }}>
+                    <img src={img.base64} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <button onClick={() => setAttachedImages(prev => prev.filter((_, j) => j !== i))}
+                      style={{ position: "absolute", top: 2, right: 2, width: 18, height: 18, borderRadius: "50%", background: "rgba(0,0,0,0.6)", border: "none", color: "#fff", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
                   </div>
-                )}
-
-                {inspirationImage && !isPlan && (
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 9, letterSpacing: "0.25em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 8 }}>Inspiration</div>
-                    <div style={{ aspectRatio: "3/4", overflow: "hidden", background: C.surface, borderRadius: 16 }}>
-                      <img src={inspirationImage} alt="Inspiration" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
-
-              {/* Right */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-                <div>
-                  <div style={{ fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: C.purple, fontWeight: 700, marginBottom: 8 }}>✦ {isPlan ? "Key Piece" : "What's Working"}</div>
-                  <div style={{ fontSize: 15, color: C.text, fontWeight: 400, lineHeight: 1.65 }}>{analysis.highlight}</div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 14 }}>The Moves</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {(analysis.moves || []).map((move, i) => <MoveCard key={i} move={move} />)}
-                  </div>
-                </div>
-
-                <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 28 }}>
-                  <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: C.muted, fontWeight: 500, marginBottom: 16 }}>Your Stylist</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-                    {messages.map((msg, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                        <div style={{ maxWidth: "80%", padding: "11px 16px", borderRadius: 18, background: msg.role === "user" ? C.purple : C.surface, color: msg.role === "user" ? C.white : C.text, border: msg.role === "user" ? "none" : `1px solid ${C.border}`, fontSize: 13, fontWeight: 400, lineHeight: 1.55, whiteSpace: "pre-wrap", borderBottomRightRadius: msg.role === "user" ? 4 : 18, borderBottomLeftRadius: msg.role === "assistant" ? 4 : 18 }}>
-                          {parseChatMessage(msg.content).map((part, j) =>
-                            part.type === "link" ? (
-                              <a key={j} href={`https://www.google.com/search?q=${encodeURIComponent(part.query)}&tbm=shop`} target="_blank" rel="noopener noreferrer"
-                                style={{ color: msg.role === "user" ? "#C4B5FD" : C.purpleLight, textDecoration: "underline", textDecorationStyle: "dotted", cursor: "pointer" }}>
-                                {part.label}
-                              </a>
-                            ) : <span key={j}>{part.content}</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {chatLoading && (
-                      <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                        <div style={{ padding: "13px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, borderBottomLeftRadius: 4 }}>
-                          <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                            {[0, 1, 2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: C.muted, animation: `fc-pulse 1.2s ease ${i * 0.2}s infinite` }} />)}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div ref={chatEndRef} />
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input className="fc-chat-input" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Reply to your stylist…"
-                      style={{ flex: 1, padding: "13px 20px", border: `1px solid ${C.border}`, background: C.surface, fontSize: 13, fontWeight: 400, color: C.text, borderRadius: 26, transition: "border-color 0.25s", fontFamily: "inherit" }} />
-                    <button onClick={sendMessage} disabled={!chatInput.trim() || chatLoading} className="fc-send"
-                      style={{ padding: "13px 22px", background: "#6D28D9", color: C.white, border: "none", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", cursor: chatInput.trim() ? "pointer" : "default", fontWeight: 600, opacity: chatInput.trim() ? 1 : 0.35, borderRadius: 26, transition: "opacity 0.25s", fontFamily: "inherit" }}>
-                      Send
-                    </button>
-                  </div>
-                </div>
-              </div>
+            )}
+            {/* Input row */}
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+              <input type="file" ref={fileInputRef} onChange={handleImageAttach} accept="image/*" multiple style={{ display: "none" }} />
+              <button onClick={() => fileInputRef.current?.click()} className="fc-attach"
+                style={{ width: 40, height: 40, borderRadius: 12, border: `1px solid ${C.border}`, background: C.surfaceHigh, color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, transition: "background 0.15s" }}>
+                📎
+              </button>
+              <textarea
+                ref={textareaRef}
+                className="fc-input"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                onInput={e => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 130) + "px"; }}
+                placeholder="Message your stylist…"
+                rows={1}
+                style={{
+                  flex: 1, padding: "10px 16px", border: `1px solid ${C.border}`,
+                  background: C.surfaceHigh, fontSize: 14, color: C.text,
+                  borderRadius: 20, resize: "none", fontFamily: "inherit",
+                  lineHeight: 1.5, maxHeight: 130, overflowY: "auto",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button onClick={send} className="fc-send"
+                disabled={sending || (!input.trim() && attachedImages.length === 0)}
+                style={{
+                  width: 40, height: 40, borderRadius: 12, background: C.purple,
+                  border: "none", color: C.white, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 18, flexShrink: 0, transition: "opacity 0.2s",
+                  opacity: (sending || (!input.trim() && attachedImages.length === 0)) ? 0.35 : 1,
+                }}>↑</button>
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-      </main>
+      {/* Panels */}
+      {panel === "profile" && (
+        <ProfilePanel profileForm={profileForm} onChange={(k, v) => setProfileForm(p => ({ ...p, [k]: v }))} onSave={async () => { setProfileSaving(true); await supabase.from("profiles").upsert({ id: user.id, ...profileForm, updated_at: new Date().toISOString() }); setProfileSaving(false); setPanel(null); }} saving={profileSaving} onClose={() => setPanel(null)} />
+      )}
+      {panel === "closet" && (
+        <ClosetPanel user={user} closet={closet} setCloset={setCloset} onClose={() => setPanel(null)} />
+      )}
+      {panel === "wishlist" && (
+        <WishlistPanel user={user} onClose={() => setPanel(null)} />
+      )}
     </div>
   );
 }
